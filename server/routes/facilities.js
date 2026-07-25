@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { queryOne, queryAll, run, runReturning } from '../db.js';
-import { authenticateToken, buildFacilityScope, canManageFacilities } from '../middleware/auth.js';
+import { authenticateToken, buildFacilityScope, canManageFacilitiesMiddleware } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -54,7 +54,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-router.post('/', authenticateToken, canManageFacilities, async (req, res) => {
+router.post('/', authenticateToken, canManageFacilitiesMiddleware, async (req, res) => {
   try {
     const { name, region, zone, woreda, kebele, facility_type, phone } = req.body;
     if (!name || !region || !zone || !woreda) {
@@ -95,7 +95,7 @@ router.post('/', authenticateToken, canManageFacilities, async (req, res) => {
   }
 });
 
-router.put('/:id', authenticateToken, canManageFacilities, async (req, res) => {
+router.put('/:id', authenticateToken, canManageFacilitiesMiddleware, async (req, res) => {
   try {
     const existing = await queryOne('SELECT * FROM facilities WHERE id = $1', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Facility not found' });
@@ -134,7 +134,7 @@ router.put('/:id', authenticateToken, canManageFacilities, async (req, res) => {
   }
 });
 
-router.delete('/:id', authenticateToken, canManageFacilities, async (req, res) => {
+router.delete('/:id', authenticateToken, canManageFacilitiesMiddleware, async (req, res) => {
   try {
     const existing = await queryOne('SELECT * FROM facilities WHERE id = $1', [req.params.id]);
     if (!existing) return res.status(404).json({ error: 'Facility not found' });

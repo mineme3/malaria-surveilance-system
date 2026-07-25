@@ -104,8 +104,22 @@ export function canManageUsers(user) {
   return ['system_admin', 'region_admin', 'zone_admin', 'district_admin'].includes(user.role);
 }
 
+export function canManageUsersMiddleware(req, res, next) {
+  if (!canManageUsers(req.user)) {
+    return res.status(403).json({ error: 'Insufficient permissions to manage users' });
+  }
+  next();
+}
+
 export function canManageFacilities(user) {
   return ['system_admin', 'region_admin', 'zone_admin', 'district_admin'].includes(user.role);
+}
+
+export function canManageFacilitiesMiddleware(req, res, next) {
+  if (!canManageFacilities(req.user)) {
+    return res.status(403).json({ error: 'Insufficient permissions to manage facilities' });
+  }
+  next();
 }
 
 export { ROLE_HIERARCHY, JWT_SECRET };

@@ -110,7 +110,7 @@ router.get('/stats', authenticateToken, async (req, res) => {
 
     const casesByWoreda = await queryAll(`SELECT c.woreda, COUNT(*) as count FROM malaria_cases c ${baseWhere} AND c.woreda != '' GROUP BY c.woreda ORDER BY count DESC LIMIT 10`, baseParams);
 
-    const casesByFacility = await queryAll(`SELECT f.name as facility_name, COUNT(*) as count FROM malaria_cases c LEFT JOIN facilities f ON c.facility_id = f.id ${baseWhere} GROUP BY c.facility_id ORDER BY count DESC LIMIT 10`, baseParams);
+    const casesByFacility = await queryAll(`SELECT f.name as facility_name, COUNT(*) as count FROM malaria_cases c LEFT JOIN facilities f ON c.facility_id = f.id ${baseWhere} GROUP BY c.facility_id, f.name ORDER BY count DESC LIMIT 10`, baseParams);
 
     const casesByAge = await queryAll(`SELECT c.age_category as category, COUNT(*) as count FROM malaria_cases c ${baseWhere} AND c.age_category != '' GROUP BY c.age_category ORDER BY count DESC`, baseParams);
 

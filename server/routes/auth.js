@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { queryOne, queryAll, run, runReturning } from '../db.js';
-import { JWT_SECRET, authenticateToken, canManageUsers, buildFacilityScope } from '../middleware/auth.js';
+import { JWT_SECRET, authenticateToken, canManageUsers, canManageUsersMiddleware, buildFacilityScope } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -119,7 +119,7 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
-router.get('/users', authenticateToken, canManageUsers, async (req, res) => {
+router.get('/users', authenticateToken, canManageUsersMiddleware, async (req, res) => {
   try {
     let where = '';
     const params = [];
@@ -147,7 +147,7 @@ router.get('/users', authenticateToken, canManageUsers, async (req, res) => {
   }
 });
 
-router.put('/users/:id', authenticateToken, canManageUsers, async (req, res) => {
+router.put('/users/:id', authenticateToken, canManageUsersMiddleware, async (req, res) => {
   try {
     const targetUser = await queryOne('SELECT * FROM users WHERE id = $1', [req.params.id]);
     if (!targetUser) return res.status(404).json({ error: 'User not found' });
