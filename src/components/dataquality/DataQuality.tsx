@@ -1,17 +1,20 @@
 import { useState, useEffect } from 'react';
-import { AlertTriangle, CheckCircle, Info } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Info, TrendingUp, BarChart3 } from 'lucide-react';
 import { api } from '../../services/api';
 
 interface QualityIssue {
   type: 'error' | 'warning' | 'info';
   message: string;
   count: number;
+  field?: string;
 }
 
 export default function DataQuality() {
   const [issues, setIssues] = useState<QualityIssue[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCases, setTotalCases] = useState(0);
+  const [completenessScore, setCompletenessScore] = useState(0);
+  const [stats, setStats] = useState({ total: 0, errors: 0, warnings: 0, infos: 0 });
 
   useEffect(() => { checkDataQuality(); }, []);
 
@@ -21,35 +24,92 @@ export default function DataQuality() {
       setTotalCases(total);
       const qIssues: QualityIssue[] = [];
 
-      const missingName = cases.filter((c: any) => !c.patient_name).length;
-      if (missingName > 0) qIssues.push({ type: 'error', message: 'Cases missing patient name', count: missingName });
+      const requiredFields = [
+        { field: 'patient_name', label: 'Patient Name' },
+        { field: 'age', label: 'Age' },
+        { field: 'sex', label: 'Sex' },
+        { field: 'date_seen', label: 'Date Seen' },
+        { field: 'facility_id', label: 'Facility' },
+      ];
 
-      const missingAge = cases.filter((c: any) => !c.age && c.age !== 0).length;
-      if (missingAge > 0) qIssues.push({ type: 'error', message: 'Cases missing age', count: missingAge });
+      let missingRequired = 0;
+      for (const { field, label } of requiredFields) {
+        const missing = cases.filter((c: any) => !c[field] && c[field] !== 0).length;
+        if (missing > 0) {
+          qIssues.push({ type: 'error', message: `Cases missing ${label}`, count: missing, field });
+          missingRequired += missing;
+        }
+      }
 
-      const missingDate = cases.filter((c: any) => !c.date_seen).length;
-      if (missingDate > 0) qIssues.push({ type: 'error', message: 'Cases missing date seen', count: missingDate });
+      const missingEpiWeek = cases.filter((c: any) => !c.epi_week).length;
+      if (missingEpiWeek > 0) {
+        qIssues.push({ type: 'error', message: 'Cases missing Epi-Week', count: missingEpiWeek, field: 'epi_week' });
+        missingRequired += missingEpiWeek;
+      }
 
-      const missingSex = cases.filter((c: any) => !c.sex).length;
-      if (missingSex > 0) qIssues.push({ type: 'error', message: 'Cases missing sex', count: missingSex });
+      const missingOnset = cases.filter((c: any) => !c.date_of_onset).length;
+      if (missingOnset > 0) {
+        qIssues.push({ type: 'warning', message: 'Cases missing Date of Onset', count: missingOnset, field: 'date_of_onset' });
+      }
 
-      const noSymptoms = cases.filter((c: any) => c.fever === 'No' && c.headache === 'No' && c.joint_pain === 'No' && c.chills_rigor === 'No' && c.vomiting === 'No' && c.back_pain === 'No' && !c.other_symptoms).length;
-      if (noSymptoms > 0) qIssues.push({ type: 'warning', message: 'Cases with no symptoms recorded', count: noSymptoms });
+      const noSymptoms = cases.filter((c: any) =>
+        c.fever === 'No' && c.headache === 'No' && c.joint_pain === 'No' &&
+        c.chills_rigor === 'No' && c.vomiting === 'No' && c.back_pain === 'No' && !c.other_symptoms
+      ).length;
+      if (noSymptoms > 0) {
+        qIssues.push({ type: 'warning', message: 'Cases with no symptoms recorded', count: noSymptoms, field: 'symptoms' });
+      }
 
       const noSpecies = cases.filter((c: any) => !c.haemoparasite_spp).length;
-      if (noSpecies > 0) qIssues.push({ type: 'warning', message: 'Cases missing haemoparasite species', count: noSpecies });
+      if (noSpecies > 0) {
+        qIssues.push({ type: 'warning', message: 'Cases missing haemoparasite species', count: noSpecies, field: 'haemoparasite_spp' });
+      }
 
       const noSpecimen = cases.filter((c: any) => c.specimen_taken === 'No').length;
-      if (noSpecimen > 0) qIssues.push({ type: 'warning', message: 'Cases where specimen was not taken', count: noSpecimen });
+      if (noSpecimen > 0) {
+        qIssues.push({ type: 'warning', message: 'Cases where specimen was not taken', count: noSpecimen, field: 'specimen_taken' });
+      }
 
-      const duplicateNames = cases.reduce((acc: Record<string, number>, c: any) => { acc[c.patient_name] = (acc[c.patient_name] || 0) + 1; return acc; }, {});
+      const noOutcome = cases.filter((c: any) => !c.outcome).length;
+      if (noOutcome > 0) {
+        qIssues.push({ type: 'warning', message: 'Cases missing outcome', count: noOutcome, field: 'outcome' });
+      }
+
+      const duplicateNames = cases.reduce((acc: Record<string, number>, c: any) => {
+        acc[c.patient_name] = (acc[c.patient_name] || 0) + 1;
+        return acc;
+      }, {});
       const duplicates = Object.entries(duplicateNames).filter(([_, count]) => (count as number) > 1);
-      if (duplicates.length > 0) qIssues.push({ type: 'info', message: `${duplicates.length} potentially duplicate patient names`, count: duplicates.length });
+      if (duplicates.length > 0) {
+        qIssues.push({ type: 'info', message: `${duplicates.length} potentially duplicate patient names`, count: duplicates.length });
+      }
 
-      const completeness = total > 0 ? (((total - missingName - missingAge - missingDate) / (total * 3)) * 100).toFixed(1) : '100';
-      qIssues.unshift({ type: 'info', message: `Overall data completeness: ${completeness}%`, count: 0 });
+      const futureDates = cases.filter((c: any) => {
+        if (!c.date_seen) return false;
+        return new Date(c.date_seen) > new Date();
+      }).length;
+      if (futureDates > 0) {
+        qIssues.push({ type: 'warning', message: 'Cases with future dates', count: futureDates, field: 'date_seen' });
+      }
+
+      const totalFields = total * 8;
+      const filledFields = totalFields - missingRequired;
+      const completeness = total > 0 ? ((filledFields / totalFields) * 100).toFixed(1) : '100';
+      setCompletenessScore(parseFloat(completeness));
+
+      qIssues.unshift({
+        type: 'info',
+        message: `Overall data completeness: ${completeness}% (${filledFields}/${totalFields} required fields filled)`,
+        count: 0,
+      });
 
       setIssues(qIssues);
+      setStats({
+        total: qIssues.length - 1,
+        errors: qIssues.filter((i) => i.type === 'error').length,
+        warnings: qIssues.filter((i) => i.type === 'warning').length,
+        infos: qIssues.filter((i) => i.type === 'info').length - 1,
+      });
     } catch (e) {} finally { setLoading(false); }
   };
 
@@ -73,14 +133,49 @@ export default function DataQuality() {
     <div>
       <h1 className="page-title mb-6">Data Quality Monitor</h1>
 
-      <div className="card mb-6">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
-            <CheckCircle className="text-primary-600" size={24} />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="card">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
+              <CheckCircle className="text-primary-600" size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Total Cases</p>
+              <p className="text-2xl font-bold">{totalCases.toLocaleString()}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm text-gray-500">Total Cases Reviewed</p>
-            <p className="text-2xl font-bold">{totalCases.toLocaleString()}</p>
+        </div>
+        <div className="card">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+              <TrendingUp className="text-blue-600" size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Completeness</p>
+              <p className="text-2xl font-bold">{completenessScore}%</p>
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+              <AlertTriangle className="text-red-600" size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Errors</p>
+              <p className="text-2xl font-bold">{stats.errors}</p>
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+              <BarChart3 className="text-amber-600" size={24} />
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Warnings</p>
+              <p className="text-2xl font-bold">{stats.warnings}</p>
+            </div>
           </div>
         </div>
       </div>

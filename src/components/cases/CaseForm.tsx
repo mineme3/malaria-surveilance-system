@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Save, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Save, ArrowLeft, CheckCircle, WifiOff, Cloud } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
+import { saveCaseOffline, getPendingCount, syncPendingCases } from '../../services/db';
 
 function getAgeCategory(age: number): string {
   if (age < 1) return '<1';
@@ -66,11 +67,30 @@ export default function CaseForm() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [savedOffline, setSavedOffline] = useState(false);
 
   useEffect(() => {
     loadFacilities();
     if (id) loadCase();
+    updatePendingCount();
   }, [id]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      autoSyncPending();
+    };
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     if (formData.age) {
@@ -80,6 +100,21 @@ export default function CaseForm() {
       }));
     }
   }, [formData.age]);
+
+  const updatePendingCount = async () => {
+    const count = await getPendingCount();
+    setPendingCount(count);
+  };
+
+  const autoSyncPending = useCallback(async () => {
+    try {
+      const result = await syncPendingCases((data) => api.createCase(data));
+      if (result.synced > 0) {
+        setPendingCount(result.remaining);
+        window.dispatchEvent(new CustomEvent('sync-complete', { detail: result }));
+      }
+    } catch (e) {}
+  }, []);
 
   const loadFacilities = async () => {
     try {
@@ -182,6 +217,7 @@ export default function CaseForm() {
     e.preventDefault();
     if (!validate()) return;
     setSaving(true);
+    setSavedOffline(false);
     try {
       const payload = {
         ...formData,
@@ -193,12 +229,36 @@ export default function CaseForm() {
       if (id) {
         await api.updateCase(parseInt(id), payload);
       } else {
-        await api.createCase(payload);
+        if (navigator.onLine) {
+          await api.createCase(payload);
+        } else {
+          await saveCaseOffline({ ...payload, created_by: user?.id || 0 });
+          setSavedOffline(true);
+          setPendingCount((prev) => prev + 1);
+        }
       }
       setSuccess(true);
       setTimeout(() => navigate('/cases'), 1500);
     } catch (err: any) {
-      setErrors({ submit: err.message || 'Failed to save' });
+      if (!navigator.onLine) {
+        try {
+          const payload = {
+            ...formData,
+            age: parseInt(formData.age) || 0,
+            epi_week: parseInt(formData.epi_week) || getCurrentEpiWeek(),
+            facility_id: parseInt(formData.facility_id) || user?.facility_id,
+          };
+          await saveCaseOffline({ ...payload, created_by: user?.id || 0 });
+          setSavedOffline(true);
+          setPendingCount((prev) => prev + 1);
+          setSuccess(true);
+          setTimeout(() => navigate('/cases'), 1500);
+        } catch (offlineErr: any) {
+          setErrors({ submit: 'Failed to save case offline' });
+        }
+      } else {
+        setErrors({ submit: err.message || 'Failed to save' });
+      }
     } finally {
       setSaving(false);
     }
@@ -240,12 +300,35 @@ export default function CaseForm() {
           <ArrowLeft size={20} />
         </button>
         <h1 className="page-title">{id ? 'Edit Case' : 'New Malaria Case Entry'}</h1>
+        <div className="ml-auto flex items-center gap-2">
+          {!isOnline && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+              <WifiOff size={12} />
+              Offline Mode
+            </span>
+          )}
+          {pendingCount > 0 && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+              <Cloud size={12} />
+              {pendingCount} pending sync
+            </span>
+          )}
+        </div>
       </div>
 
       {success && (
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-3">
-          <CheckCircle className="text-green-600" size={20} />
-          <span className="text-green-700 font-medium">Case saved successfully! Redirecting...</span>
+        <div className={`mb-6 p-4 border rounded-lg flex items-center gap-3 ${savedOffline ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+          {savedOffline ? (
+            <>
+              <WifiOff className="text-amber-600" size={20} />
+              <span className="text-amber-700 font-medium">Case saved offline. It will sync when you&apos;re back online.</span>
+            </>
+          ) : (
+            <>
+              <CheckCircle className="text-green-600" size={20} />
+              <span className="text-green-700 font-medium">Case saved successfully! Redirecting...</span>
+            </>
+          )}
         </div>
       )}
 
@@ -444,7 +527,7 @@ export default function CaseForm() {
             ) : (
               <Save size={18} />
             )}
-            {id ? 'Update Case' : 'Save Case'}
+            {id ? 'Update Case' : (savedOffline ? 'Saved Offline' : 'Save Case')}
           </button>
         </div>
       </form>

@@ -109,14 +109,59 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_cases_date ON malaria_cases(date_seen);
   CREATE INDEX IF NOT EXISTS idx_cases_week ON malaria_cases(epi_week);
   CREATE INDEX IF NOT EXISTS idx_cases_region ON malaria_cases(reporting_region);
+  CREATE INDEX IF NOT EXISTS idx_cases_zone ON malaria_cases(zone);
+  CREATE INDEX IF NOT EXISTS idx_cases_woreda ON malaria_cases(woreda);
+  CREATE INDEX IF NOT EXISTS idx_users_region ON users(region);
+  CREATE INDEX IF NOT EXISTS idx_users_zone ON users(zone);
+  CREATE INDEX IF NOT EXISTS idx_users_woreda ON users(woreda);
+  CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 `);
+
+const hash = bcrypt.hashSync('admin123', 10);
 
 const adminExists = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
 if (!adminExists) {
-  const hash = bcrypt.hashSync('admin123', 10);
   db.prepare(`INSERT INTO users (username, email, password_hash, full_name, role, region, zone, woreda)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
     'admin', 'admin@malaria.gov', hash, 'System Administrator', 'system_admin', 'DD', 'DD', 'DD'
+  );
+
+  db.prepare(`INSERT INTO facilities (name, region, zone, woreda, kebele, facility_type, phone)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+    'Congo Meda Health Center', 'DD', 'DD', 'DDHC', '3', 'Health Center', '965842088'
+  );
+  db.prepare(`INSERT INTO facilities (name, region, zone, woreda, kebele, facility_type, phone)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+    'Abadir Health Center', 'DD', 'DD', 'DDHC', 'Djibuti', 'Health Center', '915150140'
+  );
+  db.prepare(`INSERT INTO facilities (name, region, zone, woreda, kebele, facility_type, phone)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+    'Lange Health Center', 'DD', 'DD', 'DDHC', 'OroMia', 'Health Center', '969417128'
+  );
+  db.prepare(`INSERT INTO facilities (name, region, zone, woreda, kebele, facility_type, phone)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+    'Meskelegn Health Post', 'DD', 'DD', 'DDHC', '2', 'Health Post', '937947475'
+  );
+  db.prepare(`INSERT INTO facilities (name, region, zone, woreda, kebele, facility_type, phone)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`).run(
+    'GtesFa Health Center', 'DD', 'DD', 'DDHC', '2', 'Health Center', '943282084'
+  );
+
+  db.prepare(`INSERT INTO users (username, email, password_hash, full_name, role, facility_id, region, zone, woreda)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    'facility1', 'facility1@malaria.gov', hash, 'Facility User 1', 'facility_user', 1, 'DD', 'DD', 'DDHC'
+  );
+  db.prepare(`INSERT INTO users (username, email, password_hash, full_name, role, region, zone, woreda)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    'district1', 'district1@malaria.gov', hash, 'District Admin 1', 'district_admin', 'DD', 'DD', 'DDHC'
+  );
+  db.prepare(`INSERT INTO users (username, email, password_hash, full_name, role, region, zone, woreda)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    'zone1', 'zone1@malaria.gov', hash, 'Zone Admin 1', 'zone_admin', 'DD', 'DD', ''
+  );
+  db.prepare(`INSERT INTO users (username, email, password_hash, full_name, role, region, zone, woreda)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    'region1', 'region1@malaria.gov', hash, 'Region Admin 1', 'region_admin', 'DD', '', ''
   );
 }
 

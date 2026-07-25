@@ -7,27 +7,18 @@ class ApiService {
     this.token = token;
   }
 
-  private async request(endpoint: string, options: RequestInit = {}) {
+  async request(endpoint: string, options: RequestInit = {}) {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(options.headers as Record<string, string> || {}),
     };
-
     const token = this.token || localStorage.getItem('token');
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      ...options,
-      headers,
-    });
-
+    if (token) { headers['Authorization'] = `Bearer ${token}`; }
+    const response = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Request failed' }));
       throw new Error(error.error || 'Request failed');
     }
-
     return response.json();
   }
 
@@ -60,8 +51,19 @@ class ApiService {
     });
   }
 
+  async resetPassword(id: number, password: string) {
+    return this.request(`/auth/users/${id}/reset-password`, {
+      method: 'PUT',
+      body: JSON.stringify({ password }),
+    });
+  }
+
   async getFacilities() {
     return this.request('/facilities');
+  }
+
+  async getAllFacilities() {
+    return this.request('/facilities/all');
   }
 
   async createFacility(data: any) {
@@ -124,6 +126,11 @@ class ApiService {
     });
   }
 
+  async exportCases(params: Record<string, string> = {}) {
+    const query = new URLSearchParams(params).toString();
+    return this.request(`/cases/export?${query}`);
+  }
+
   async getReport(params: Record<string, string> = {}) {
     const query = new URLSearchParams(params).toString();
     return this.request(`/reports/generate?${query}`);
@@ -148,6 +155,13 @@ class ApiService {
 
   async markAllNotificationsRead() {
     return this.request('/notifications/read-all', { method: 'PUT' });
+  }
+
+  async sendNotification(data: any) {
+    return this.request('/notifications/send', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 }
 

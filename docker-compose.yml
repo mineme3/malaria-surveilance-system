@@ -1,0 +1,22 @@
+services:
+  malaria-pwa:
+    build: .
+    container_name: malaria-pwa
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - JWT_SECRET=malaria-pwa-secret-key-change-in-production
+      - NODE_ENV=production
+    volumes:
+      - malaria-data:/app/server
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  malaria-data:

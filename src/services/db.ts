@@ -1,5 +1,4 @@
 import Dexie from 'dexie';
-import type { MalariaCase } from '../types';
 
 class MalariaDB extends Dexie {
   cases!: Dexie.Table<any, number>;
@@ -7,14 +6,14 @@ class MalariaDB extends Dexie {
   constructor() {
     super('MalariaPWA');
     this.version(1).stores({
-      cases: '++id, facility_id, sync_status, patient_name, date_seen',
+      cases: '++id, facility_id, sync_status, patient_name, date_seen, created_at',
     });
   }
 }
 
 const db = new MalariaDB();
 
-export async function saveCaseOffline(caseData: Omit<MalariaCase, 'id' | 'created_at' | 'updated_at'>) {
+export async function saveCaseOffline(caseData: any) {
   const id = await db.cases.add({
     ...caseData,
     sync_status: 'pending',
@@ -28,8 +27,16 @@ export async function getPendingCases() {
   return db.cases.where('sync_status').equals('pending').toArray();
 }
 
+export async function getPendingCount() {
+  return db.cases.where('sync_status').equals('pending').count();
+}
+
 export async function markCaseSynced(id: number) {
   await db.cases.update(id, { sync_status: 'synced' });
+}
+
+export async function markCaseConflict(id: number) {
+  await db.cases.update(id, { sync_status: 'conflict' });
 }
 
 export async function getAllOfflineCases() {
@@ -43,16 +50,20 @@ export async function deleteOfflineCase(id: number) {
 export async function syncPendingCases(apiFn: (data: any) => Promise<any>) {
   const pending = await getPendingCases();
   let synced = 0;
+  let failed = 0;
+
   for (const c of pending) {
     try {
-      await apiFn(c);
+      const { id: _id, sync_status, ...payload } = c;
+      await apiFn(payload);
       await markCaseSynced(c.id!);
       synced++;
     } catch (e) {
-      // will retry next time
+      failed++;
     }
   }
-  return synced;
+
+  return { synced, failed, remaining: pending.length - synced };
 }
 
 export default db;
