@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import db from '../db.js';
+import { queryOne } from '../db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'malaria-pwa-secret-key-change-in-production';
 
@@ -12,7 +12,7 @@ const ROLE_HIERARCHY = {
   system_admin: 5,
 };
 
-export function authenticateToken(req, res, next) {
+export async function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -22,7 +22,10 @@ export function authenticateToken(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = db.prepare('SELECT id, username, email, full_name, role, facility_id, region, zone, woreda, is_active FROM users WHERE id = ? AND is_active = 1').get(decoded.id);
+    const user = await queryOne(
+      'SELECT id, username, email, full_name, role, facility_id, region, zone, woreda, is_active FROM users WHERE id = $1 AND is_active = 1',
+      [decoded.id]
+    );
     if (!user) {
       return res.status(401).json({ error: 'User account is disabled' });
     }
@@ -58,14 +61,14 @@ export function buildDataScope(user) {
     case 'system_admin':
       return { where: '', params: [] };
     case 'region_admin':
-      return { where: ' AND c.reporting_region = ?', params: [user.region] };
+      return { where: ' AND c.reporting_region = $1', params: [user.region] };
     case 'zone_admin':
-      return { where: ' AND c.zone = ? AND c.reporting_region = ?', params: [user.zone, user.region] };
+      return { where: ' AND c.zone = $1 AND c.reporting_region = $2', params: [user.zone, user.region] };
     case 'district_admin':
-      return { where: ' AND c.woreda = ? AND c.zone = ? AND c.reporting_region = ?', params: [user.woreda, user.zone, user.region] };
+      return { where: ' AND c.woreda = $1 AND c.zone = $2 AND c.reporting_region = $3', params: [user.woreda, user.zone, user.region] };
     case 'facility_admin':
     case 'facility_user':
-      return { where: ' AND c.facility_id = ?', params: [user.facility_id] };
+      return { where: ' AND c.facility_id = $1', params: [user.facility_id] };
     default:
       return { where: ' AND 1=0', params: [] };
   }
@@ -76,14 +79,14 @@ export function buildFacilityScope(user) {
     case 'system_admin':
       return { where: '', params: [] };
     case 'region_admin':
-      return { where: ' WHERE region = ?', params: [user.region] };
+      return { where: ' WHERE region = $1', params: [user.region] };
     case 'zone_admin':
-      return { where: ' WHERE zone = ? AND region = ?', params: [user.zone, user.region] };
+      return { where: ' WHERE zone = $1 AND region = $2', params: [user.zone, user.region] };
     case 'district_admin':
-      return { where: ' WHERE woreda = ? AND zone = ? AND region = ?', params: [user.woreda, user.zone, user.region] };
+      return { where: ' WHERE woreda = $1 AND zone = $2 AND region = $3', params: [user.woreda, user.zone, user.region] };
     case 'facility_admin':
     case 'facility_user':
-      return { where: ' WHERE id = ?', params: [user.facility_id] };
+      return { where: ' WHERE id = $1', params: [user.facility_id] };
     default:
       return { where: ' WHERE 1=0', params: [] };
   }

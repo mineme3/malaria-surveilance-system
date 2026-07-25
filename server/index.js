@@ -4,6 +4,8 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { initDatabase } from './schema.js';
+import { seedDatabase } from './seed.js';
 import authRoutes from './routes/auth.js';
 import facilityRoutes from './routes/facilities.js';
 import caseRoutes from './routes/cases.js';
@@ -53,6 +55,21 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
-});
+async function startServer() {
+  try {
+    console.log('Initializing database...');
+    await initDatabase();
+
+    console.log('Seeding database...');
+    await seedDatabase();
+
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('Failed to start server:', err.message);
+    process.exit(1);
+  }
+}
+
+startServer();

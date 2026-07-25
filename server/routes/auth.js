@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import db from '../db.js';
+import { queryOne, queryAll, run, runReturning } from '../db.js';
 import { JWT_SECRET, authenticateToken, canManageUsers, buildFacilityScope } from '../middleware/auth.js';
 
 const router = Router();
 
-router.post('/register', authenticateToken, (req, res) => {
+router.post('/register', authenticateToken, async (req, res) => {
   try {
     if (!canManageUsers(req.user)) {
       return res.status(403).json({ error: 'Only administrators can create user accounts' });
@@ -22,7 +22,7 @@ router.post('/register', authenticateToken, (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
-    const existing = db.prepare('SELECT id FROM users WHERE username = ? OR email = ?').get(username, email);
+    const existing = await queryOne('SELECT id FROM users WHERE username = $1 OR email = $2', [username, email]);
     if (existing) {
       return res.status(409).json({ error: 'Username or email already exists' });
     }
@@ -56,22 +56,25 @@ router.post('/register', authenticateToken, (req, res) => {
     }
 
     const hash = bcrypt.hashSync(password, 10);
-    const result = db.prepare(`INSERT INTO users (username, email, password_hash, full_name, role, facility_id, region, zone, woreda)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-      username, email, hash, full_name, targetRole, facility_id || null, userRegion, userZone, userWoreda
+    const result = await runReturning(
+      `INSERT INTO users (username, email, password_hash, full_name, role, facility_id, region, zone, woreda)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      [username, email, hash, full_name, targetRole, facility_id || null, userRegion, userZone, userWoreda]
     );
 
-    db.prepare(`INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
-      VALUES (?, 'create', 'user', ?, ?)`).run(req.user.id, result.lastInsertRowid,
-      `Created user: ${username} with role: ${targetRole}`);
+    await run(
+      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
+       VALUES ($1, 'create', 'user', $2, $3)`,
+      [req.user.id, result.id, `Created user: ${username} with role: ${targetRole}`]
+    );
 
-    res.status(201).json({ message: 'User registered successfully', userId: result.lastInsertRowid });
+    res.status(201).json({ message: 'User registered successfully', userId: result.id });
   } catch (err) {
     res.status(500).json({ error: 'Registration failed', details: err.message });
   }
 });
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -79,7 +82,7 @@ router.post('/login', (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    const user = db.prepare('SELECT * FROM users WHERE username = ? AND is_active = 1').get(username);
+    const user = await queryOne('SELECT * FROM users WHERE username = $1 AND is_active = 1', [username]);
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -94,8 +97,11 @@ router.post('/login', (req, res) => {
       { expiresIn: '24h' }
     );
 
-    db.prepare(`INSERT INTO audit_logs (user_id, action, entity_type, details)
-      VALUES (?, 'login', 'user', ?)`).run(user.id, `User ${user.username} logged in from ${req.ip || 'unknown'}`);
+    await run(
+      `INSERT INTO audit_logs (user_id, action, entity_type, details)
+       VALUES ($1, 'login', 'user', $2)`,
+      [user.id, `User ${user.username} logged in from ${req.ip || 'unknown'}`]
+    );
 
     const { password_hash, ...userWithoutPassword } = user;
     res.json({ token, user: userWithoutPassword });
@@ -104,7 +110,7 @@ router.post('/login', (req, res) => {
   }
 });
 
-router.get('/me', authenticateToken, (req, res) => {
+router.get('/me', authenticateToken, async (req, res) => {
   try {
     const { password_hash, ...userWithoutPassword } = req.user;
     res.json(userWithoutPassword);
@@ -113,33 +119,37 @@ router.get('/me', authenticateToken, (req, res) => {
   }
 });
 
-router.get('/users', authenticateToken, canManageUsers, (req, res) => {
+router.get('/users', authenticateToken, canManageUsers, async (req, res) => {
   try {
     let where = '';
     const params = [];
+    let paramIndex = 1;
 
     if (req.user.role === 'region_admin') {
-      where = ' WHERE region = ?';
+      where = ` WHERE region = $${paramIndex++}`;
       params.push(req.user.region);
     } else if (req.user.role === 'zone_admin') {
-      where = ' WHERE zone = ? AND region = ?';
+      where = ` WHERE zone = $${paramIndex++} AND region = $${paramIndex++}`;
       params.push(req.user.zone, req.user.region);
     } else if (req.user.role === 'district_admin') {
-      where = ' WHERE woreda = ? AND zone = ? AND region = ?';
+      where = ` WHERE woreda = $${paramIndex++} AND zone = $${paramIndex++} AND region = $${paramIndex++}`;
       params.push(req.user.woreda, req.user.zone, req.user.region);
     }
 
-    const users = db.prepare(`SELECT id, username, email, full_name, role, facility_id, region, zone, woreda, is_active, created_at
-      FROM users ${where} ORDER BY created_at DESC`).all(...params);
+    const users = await queryAll(
+      `SELECT id, username, email, full_name, role, facility_id, region, zone, woreda, is_active, created_at
+       FROM users ${where} ORDER BY created_at DESC`,
+      params
+    );
     res.json(users);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch users' });
   }
 });
 
-router.put('/users/:id', authenticateToken, canManageUsers, (req, res) => {
+router.put('/users/:id', authenticateToken, canManageUsers, async (req, res) => {
   try {
-    const targetUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+    const targetUser = await queryOne('SELECT * FROM users WHERE id = $1', [req.params.id]);
     if (!targetUser) return res.status(404).json({ error: 'User not found' });
 
     if (req.user.role !== 'system_admin') {
@@ -167,12 +177,16 @@ router.put('/users/:id', authenticateToken, canManageUsers, (req, res) => {
       return res.status(403).json({ error: `Cannot assign role: ${role}` });
     }
 
-    db.prepare('UPDATE users SET full_name = ?, role = ?, is_active = ?, facility_id = ? WHERE id = ?')
-      .run(full_name || targetUser.full_name, role || targetUser.role, is_active !== undefined ? (is_active ? 1 : 0) : targetUser.is_active, facility_id || targetUser.facility_id, req.params.id);
+    await run(
+      'UPDATE users SET full_name = $1, role = $2, is_active = $3, facility_id = $4 WHERE id = $5',
+      [full_name || targetUser.full_name, role || targetUser.role, is_active !== undefined ? (is_active ? 1 : 0) : targetUser.is_active, facility_id || targetUser.facility_id, req.params.id]
+    );
 
-    db.prepare(`INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
-      VALUES (?, 'update', 'user', ?, ?)`).run(req.user.id, req.params.id,
-      `Updated user: ${targetUser.username}`);
+    await run(
+      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
+       VALUES ($1, 'update', 'user', $2, $3)`,
+      [req.user.id, req.params.id, `Updated user: ${targetUser.username}`]
+    );
 
     res.json({ message: 'User updated' });
   } catch (err) {
@@ -180,13 +194,13 @@ router.put('/users/:id', authenticateToken, canManageUsers, (req, res) => {
   }
 });
 
-router.put('/users/:id/reset-password', authenticateToken, (req, res) => {
+router.put('/users/:id/reset-password', authenticateToken, async (req, res) => {
   try {
     if (req.user.role !== 'system_admin') {
       return res.status(403).json({ error: 'Only system administrators can reset passwords' });
     }
 
-    const targetUser = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+    const targetUser = await queryOne('SELECT * FROM users WHERE id = $1', [req.params.id]);
     if (!targetUser) return res.status(404).json({ error: 'User not found' });
 
     const { password } = req.body;
@@ -195,11 +209,13 @@ router.put('/users/:id/reset-password', authenticateToken, (req, res) => {
     }
 
     const hash = bcrypt.hashSync(password, 10);
-    db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, req.params.id);
+    await run('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.params.id]);
 
-    db.prepare(`INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
-      VALUES (?, 'update', 'user', ?, ?)`).run(req.user.id, req.params.id,
-      `Reset password for user: ${targetUser.username}`);
+    await run(
+      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
+       VALUES ($1, 'update', 'user', $2, $3)`,
+      [req.user.id, req.params.id, `Reset password for user: ${targetUser.username}`]
+    );
 
     res.json({ message: 'Password reset successfully' });
   } catch (err) {
