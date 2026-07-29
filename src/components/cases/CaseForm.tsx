@@ -1,9 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Save, ArrowLeft, CheckCircle, WifiOff, Cloud } from 'lucide-react';
+import { Save, ArrowLeft, CheckCircle, WifiOff, Cloud, AlertCircle, MapPin, User, Calendar, Stethoscope, TestTube, Plane, Heart } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { saveCaseOffline, getPendingCount, syncPendingCases } from '../../services/db';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Badge } from '../ui/badge';
 
 function getAgeCategory(age: number): string {
   if (age < 1) return '<1';
@@ -266,19 +271,21 @@ export default function CaseForm() {
 
   const YesNoField = ({ label, field }: { label: string; field: string }) => (
     <div>
-      <label className="label">{label}</label>
-      <div className="flex gap-4 mt-1">
+      <Label>{label}</Label>
+      <div className="flex gap-4 mt-1.5">
         {['Yes', 'No'].map((opt) => (
-          <label key={opt} className="flex items-center gap-2 cursor-pointer">
+          <label key={opt} className="relative flex items-center gap-2 cursor-pointer group">
             <input
               type="radio"
               name={field}
               value={opt}
               checked={formData[field as keyof typeof formData] === opt}
               onChange={(e) => handleChange(field, e.target.value)}
-              className="text-primary-600 focus:ring-primary-500"
+              className="peer sr-only"
             />
-            <span className="text-sm">{opt}</span>
+            <span className="block px-4 py-1.5 text-sm rounded-lg border border-gray-300 peer-checked:bg-primary-600 peer-checked:text-white peer-checked:border-primary-600 peer-checked:shadow-sm hover:border-gray-400 transition-all">
+              {opt}
+            </span>
           </label>
         ))}
       </div>
@@ -295,240 +302,297 @@ export default function CaseForm() {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => navigate('/cases')} className="p-2 hover:bg-gray-100 rounded-lg">
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/cases')} className="flex-shrink-0">
           <ArrowLeft size={20} />
-        </button>
-        <h1 className="page-title">{id ? 'Edit Case' : 'New Malaria Case Entry'}</h1>
+        </Button>
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{id ? 'Edit Case' : 'New Malaria Case Entry'}</h1>
         <div className="ml-auto flex items-center gap-2">
           {!isOnline && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+            <Badge variant="warning" className="gap-1.5">
               <WifiOff size={12} />
               Offline Mode
-            </span>
+            </Badge>
           )}
           {pendingCount > 0 && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+            <Badge variant="default" className="gap-1.5">
               <Cloud size={12} />
               {pendingCount} pending sync
-            </span>
+            </Badge>
           )}
         </div>
       </div>
 
       {success && (
-        <div className={`mb-6 p-4 border rounded-lg flex items-center gap-3 ${savedOffline ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+        <div className={`mb-6 p-4 border rounded-xl flex items-center gap-3 shadow-sm ${savedOffline ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
           {savedOffline ? (
             <>
-              <WifiOff className="text-amber-600" size={20} />
-              <span className="text-amber-700 font-medium">Case saved offline. It will sync when you&apos;re back online.</span>
+              <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <WifiOff className="text-amber-600" size={20} />
+              </div>
+              <span className="text-amber-800 font-medium text-sm">Case saved offline. It will sync automatically when you&apos;re back online.</span>
             </>
           ) : (
             <>
-              <CheckCircle className="text-green-600" size={20} />
-              <span className="text-green-700 font-medium">Case saved successfully! Redirecting...</span>
+              <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <CheckCircle className="text-green-600" size={20} />
+              </div>
+              <div>
+                <span className="text-green-800 font-medium text-sm">Case saved successfully!</span>
+                <p className="text-green-700 text-xs mt-0.5">Redirecting to case list...</p>
+              </div>
             </>
           )}
         </div>
       )}
 
       {errors.submit && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          {errors.submit}
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3">
+          <AlertCircle className="text-red-500 flex-shrink-0" size={18} />
+          <span className="text-red-700 text-sm">{errors.submit}</span>
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Location Section */}
-        <div className="card">
-          <h3 className="section-title">Location Information</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="label">Facility *</label>
-              <select value={formData.facility_id} onChange={(e) => handleFacilityChange(e.target.value)} className="select-field">
-                <option value="">Select Facility</option>
-                {facilities.map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
-              </select>
-              {errors.facility_id && <p className="text-red-500 text-xs mt-1">{errors.facility_id}</p>}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <MapPin size={16} className="text-primary-600" />
+              Location Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label>Facility <span className="text-red-500">*</span></Label>
+                <select value={formData.facility_id} onChange={(e) => handleFacilityChange(e.target.value)} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50">
+                  <option value="">Select Facility</option>
+                  {facilities.map((f) => (
+                    <option key={f.id} value={f.id}>{f.name}</option>
+                  ))}
+                </select>
+                {errors.facility_id && <p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={10} />{errors.facility_id}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label>Reporting Region</Label>
+                <Input type="text" value={formData.reporting_region} onChange={(e) => handleChange('reporting_region', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Zone</Label>
+                <Input type="text" value={formData.zone} onChange={(e) => handleChange('zone', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Woreda</Label>
+                <Input type="text" value={formData.woreda} onChange={(e) => handleChange('woreda', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Reporting HF</Label>
+                <Input type="text" value={formData.reporting_hf} onChange={(e) => handleChange('reporting_hf', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Kebele</Label>
+                <Input type="text" value={formData.kebele} onChange={(e) => handleChange('kebele', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>House No</Label>
+                <Input type="text" value={formData.house_no} onChange={(e) => handleChange('house_no', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Mobile Phone</Label>
+                <Input type="tel" value={formData.mobile_phone} onChange={(e) => handleChange('mobile_phone', e.target.value)} />
+              </div>
             </div>
-            <div>
-              <label className="label">Reporting Region</label>
-              <input type="text" value={formData.reporting_region} onChange={(e) => handleChange('reporting_region', e.target.value)} className="input-field" />
-            </div>
-            <div>
-              <label className="label">Zone</label>
-              <input type="text" value={formData.zone} onChange={(e) => handleChange('zone', e.target.value)} className="input-field" />
-            </div>
-            <div>
-              <label className="label">Woreda</label>
-              <input type="text" value={formData.woreda} onChange={(e) => handleChange('woreda', e.target.value)} className="input-field" />
-            </div>
-            <div>
-              <label className="label">Reporting HF</label>
-              <input type="text" value={formData.reporting_hf} onChange={(e) => handleChange('reporting_hf', e.target.value)} className="input-field" />
-            </div>
-            <div>
-              <label className="label">Kebele</label>
-              <input type="text" value={formData.kebele} onChange={(e) => handleChange('kebele', e.target.value)} className="input-field" />
-            </div>
-            <div>
-              <label className="label">House No</label>
-              <input type="text" value={formData.house_no} onChange={(e) => handleChange('house_no', e.target.value)} className="input-field" />
-            </div>
-            <div>
-              <label className="label">Mobile Phone</label>
-              <input type="tel" value={formData.mobile_phone} onChange={(e) => handleChange('mobile_phone', e.target.value)} className="input-field" />
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Patient Information */}
-        <div className="card">
-          <h3 className="section-title">Patient Information</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="md:col-span-2">
-              <label className="label">Patient Name *</label>
-              <input type="text" value={formData.patient_name} onChange={(e) => handleChange('patient_name', e.target.value)} className="input-field" placeholder="Full name" />
-              {errors.patient_name && <p className="text-red-500 text-xs mt-1">{errors.patient_name}</p>}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <User size={16} className="text-primary-600" />
+              Patient Information
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-2 space-y-1.5">
+                <Label>Patient Name <span className="text-red-500">*</span></Label>
+                <Input type="text" value={formData.patient_name} onChange={(e) => handleChange('patient_name', e.target.value)} placeholder="Full name" />
+                {errors.patient_name && <p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={10} />{errors.patient_name}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label>Admission Type</Label>
+                <select value={formData.admission_type} onChange={(e) => handleChange('admission_type', e.target.value)} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50">
+                  <option value="Out-Patient">Out-Patient</option>
+                  <option value="In-Patient">In-Patient</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Sex <span className="text-red-500">*</span></Label>
+                <select value={formData.sex} onChange={(e) => handleChange('sex', e.target.value)} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50">
+                  <option value="M">Male (M)</option>
+                  <option value="F">Female (F)</option>
+                </select>
+                {errors.sex && <p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={10} />{errors.sex}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label>Age <span className="text-red-500">*</span></Label>
+                <Input type="number" min={0} max={150} value={formData.age} onChange={(e) => handleChange('age', e.target.value)} placeholder="Years" />
+                {errors.age && <p className="text-red-500 text-xs mt-1 flex items-center gap-1"><AlertCircle size={10} />{errors.age}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label>Age Category</Label>
+                <Input type="text" value={formData.age_category} readOnly className="bg-gray-50 text-gray-500" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Epi-Week</Label>
+                <Input type="number" min={1} max={53} value={formData.epi_week} onChange={(e) => handleChange('epi_week', e.target.value)} />
+              </div>
             </div>
-            <div>
-              <label className="label">Admission Type</label>
-              <select value={formData.admission_type} onChange={(e) => handleChange('admission_type', e.target.value)} className="select-field">
-                <option value="Out-Patient">Out-Patient</option>
-                <option value="In-Patient">In-Patient</option>
-              </select>
-            </div>
-            <div>
-              <label className="label">Sex *</label>
-              <select value={formData.sex} onChange={(e) => handleChange('sex', e.target.value)} className="select-field">
-                <option value="M">Male (M)</option>
-                <option value="F">Female (F)</option>
-              </select>
-              {errors.sex && <p className="text-red-500 text-xs mt-1">{errors.sex}</p>}
-            </div>
-            <div>
-              <label className="label">Age *</label>
-              <input type="number" min="0" max="150" value={formData.age} onChange={(e) => handleChange('age', e.target.value)} className="input-field" placeholder="Years" />
-              {errors.age && <p className="text-red-500 text-xs mt-1">{errors.age}</p>}
-            </div>
-            <div>
-              <label className="label">Age Category</label>
-              <input type="text" value={formData.age_category} readOnly className="input-field bg-gray-50" />
-            </div>
-            <div>
-              <label className="label">Epi-Week</label>
-              <input type="number" min="1" max="53" value={formData.epi_week} onChange={(e) => handleChange('epi_week', e.target.value)} className="input-field" />
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Dates */}
-        <div className="card">
-          <h3 className="section-title">Clinical Dates</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Date of Onset</label>
-              <input type="date" value={formData.date_of_onset} onChange={(e) => handleChange('date_of_onset', e.target.value)} className="input-field" />
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Calendar size={16} className="text-primary-600" />
+              Clinical Dates
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Date of Onset</Label>
+                <Input type="date" value={formData.date_of_onset} onChange={(e) => handleChange('date_of_onset', e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Date Seen at Facility</Label>
+                <Input type="date" value={formData.date_seen} onChange={(e) => handleChange('date_seen', e.target.value)} />
+              </div>
             </div>
-            <div>
-              <label className="label">Date Seen at Facility</label>
-              <input type="date" value={formData.date_seen} onChange={(e) => handleChange('date_seen', e.target.value)} className="input-field" />
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Symptoms */}
-        <div className="card">
-          <h3 className="section-title">Signs & Symptoms</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <YesNoField label="Fever" field="fever" />
-            <YesNoField label="Headache" field="headache" />
-            <YesNoField label="Joint Pain" field="joint_pain" />
-            <YesNoField label="Chills & Rigor" field="chills_rigor" />
-            <YesNoField label="Vomiting" field="vomiting" />
-            <YesNoField label="Back Pain" field="back_pain" />
-            <div className="md:col-span-3">
-              <label className="label">Other Symptoms & Signs</label>
-              <input type="text" value={formData.other_symptoms} onChange={(e) => handleChange('other_symptoms', e.target.value)} className="input-field" placeholder="Describe any other symptoms" />
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Stethoscope size={16} className="text-primary-600" />
+              Signs &amp; Symptoms
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <YesNoField label="Fever" field="fever" />
+              <YesNoField label="Headache" field="headache" />
+              <YesNoField label="Joint Pain" field="joint_pain" />
+              <YesNoField label="Chills & Rigor" field="chills_rigor" />
+              <YesNoField label="Vomiting" field="vomiting" />
+              <YesNoField label="Back Pain" field="back_pain" />
+              <div className="md:col-span-3 space-y-1.5">
+                <Label>Other Symptoms &amp; Signs</Label>
+                <Input type="text" value={formData.other_symptoms} onChange={(e) => handleChange('other_symptoms', e.target.value)} placeholder="Describe any other symptoms" />
+              </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Lab & Diagnosis */}
-        <div className="card">
-          <h3 className="section-title">Laboratory & Diagnosis</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <YesNoField label="Specimen Taken (RDT/BF/WBC)" field="specimen_taken" />
-            <div>
-              <label className="label">Haemoparasite Species</label>
-              <select value={formData.haemoparasite_spp} onChange={(e) => handleChange('haemoparasite_spp', e.target.value)} className="select-field">
-                <option value="">Select Species</option>
-                <option value="PF">P.F (Plasmodium Falciparum)</option>
-                <option value="PV">P.V (Plasmodium Vivax)</option>
-                <option value="Vivax">Vivax</option>
-                <option value="Mixed">Mixed</option>
-              </select>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <TestTube size={16} className="text-primary-600" />
+              Laboratory &amp; Diagnosis
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <YesNoField label="Specimen Taken (RDT/BF/WBC)" field="specimen_taken" />
+              <div className="space-y-1.5">
+                <Label>Haemoparasite Species</Label>
+                <select value={formData.haemoparasite_spp} onChange={(e) => handleChange('haemoparasite_spp', e.target.value)} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50">
+                  <option value="">Select Species</option>
+                  <option value="PF">P.F (Plasmodium Falciparum)</option>
+                  <option value="PV">P.V (Plasmodium Vivax)</option>
+                  <option value="Vivax">Vivax</option>
+                  <option value="Mixed">Mixed</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Travel to Malaria Area</Label>
+                <select value={formData.travel_to_malaria_area} onChange={(e) => handleChange('travel_to_malaria_area', e.target.value)} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50">
+                  <option value="No">No</option>
+                  <option value="Indigenous">Indigenous</option>
+                  <option value="Imported">Imported</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="label">Travel to Malaria Area</label>
-              <select value={formData.travel_to_malaria_area} onChange={(e) => handleChange('travel_to_malaria_area', e.target.value)} className="select-field">
-                <option value="No">No</option>
-                <option value="Indigenous">Indigenous</option>
-                <option value="Imported">Imported</option>
-              </select>
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Travel & History */}
-        <div className="card">
-          <h3 className="section-title">Travel History & Comments</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="label">Travel History / Comments</label>
-              <textarea value={formData.travel_history} onChange={(e) => handleChange('travel_history', e.target.value)} className="input-field" rows={3} placeholder="Specify travel history" />
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Plane size={16} className="text-primary-600" />
+              Travel History &amp; Comments
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Travel History / Comments</Label>
+                <textarea value={formData.travel_history} onChange={(e) => handleChange('travel_history', e.target.value)} className="flex min-h-[80px] w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50" rows={3} placeholder="Specify travel history" />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Source of Infection</Label>
+                <Input type="text" value={formData.source_of_infection} onChange={(e) => handleChange('source_of_infection', e.target.value)} />
+              </div>
             </div>
-            <div>
-              <label className="label">Source of Infection</label>
-              <input type="text" value={formData.source_of_infection} onChange={(e) => handleChange('source_of_infection', e.target.value)} className="input-field" />
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Outcome & Follow-up */}
-        <div className="card">
-          <h3 className="section-title">Outcome & Follow-up</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="label">Outcome</label>
-              <select value={formData.outcome} onChange={(e) => handleChange('outcome', e.target.value)} className="select-field">
-                <option value="Alive">Alive</option>
-                <option value="Death">Death</option>
-              </select>
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Heart size={16} className="text-primary-600" />
+              Outcome &amp; Follow-up
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <Label>Outcome</Label>
+                <select value={formData.outcome} onChange={(e) => handleChange('outcome', e.target.value)} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50">
+                  <option value="Alive">Alive</option>
+                  <option value="Death">Death</option>
+                </select>
+              </div>
+              <YesNoField label="FTAT Done" field="ftat_done" />
+              <div className="space-y-1.5">
+                <Label>Referred Facility</Label>
+                <Input type="text" value={formData.referred_facility} onChange={(e) => handleChange('referred_facility', e.target.value)} />
+              </div>
             </div>
-            <YesNoField label="FTAT Done" field="ftat_done" />
-            <div>
-              <label className="label">Referred Facility</label>
-              <input type="text" value={formData.referred_facility} onChange={(e) => handleChange('referred_facility', e.target.value)} className="input-field" />
-            </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* Submit */}
         <div className="flex items-center justify-end gap-3">
-          <button type="button" onClick={() => navigate('/cases')} className="btn-secondary">
+          <Button type="button" variant="outline" onClick={() => navigate('/cases')}>
             Cancel
-          </button>
-          <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2">
+          </Button>
+          <Button type="submit" disabled={saving} className="gap-2">
             {saving ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
-              <Save size={18} />
+              <Save size={16} />
             )}
             {id ? 'Update Case' : (savedOffline ? 'Saved Offline' : 'Save Case')}
-          </button>
+          </Button>
         </div>
       </form>
     </div>

@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Edit, User, MapPin, Calendar, Stethoscope, TestTube, Plane, Heart } from 'lucide-react';
 import { api } from '../../services/api';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 
 export default function CaseDetail() {
   const { id } = useParams();
@@ -35,138 +38,120 @@ export default function CaseDetail() {
     return (
       <div className="text-center py-20">
         <p className="text-gray-500">Case not found</p>
-        <button onClick={() => navigate('/cases')} className="btn-primary mt-4">Back to Cases</button>
+        <Button onClick={() => navigate('/cases')} variant="outline" className="mt-4">Back to Cases</Button>
       </div>
     );
   }
 
   const DetailItem = ({ label, value }: { label: string; value: string }) => (
-    <div>
-      <dt className="text-xs text-gray-500 uppercase tracking-wider">{label}</dt>
-      <dd className="mt-1 text-sm font-medium text-gray-900">{value || '-'}</dd>
+    <div className="border-b border-gray-100 pb-2 last:border-0 last:pb-0">
+      <dt className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label}</dt>
+      <dd className="mt-0.5 text-sm font-medium text-gray-900">{value || '-'}</dd>
     </div>
+  );
+
+  const SectionCard = ({ icon: Icon, title, children }: { icon: any; title: string; children: React.ReactNode }) => (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
+          <Icon size={16} className="text-primary-600" />
+          {title}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <dl className="space-y-2">{children}</dl>
+      </CardContent>
+    </Card>
   );
 
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/cases')} className="p-2 hover:bg-gray-100 rounded-lg">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/cases')}>
             <ArrowLeft size={20} />
-          </button>
-          <h1 className="page-title">Case Details</h1>
+          </Button>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Case Details</h1>
+            <p className="text-sm text-gray-500">Case #{caseData.id}</p>
+          </div>
         </div>
-        <Link to={`/cases/edit/${id}`} className="btn-primary flex items-center gap-2 text-sm">
-          <Edit size={16} /> Edit
+        <Link to={`/cases/edit/${id}`}>
+          <Button className="gap-2">
+            <Edit size={16} /> Edit
+          </Button>
         </Link>
       </div>
 
       {/* Patient Header */}
-      <div className="card mb-6">
-        <div className="flex items-center gap-4">
-          <div className="w-14 h-14 bg-primary-100 rounded-full flex items-center justify-center">
-            <User className="text-primary-600" size={24} />
+      <Card className="mb-6 bg-gradient-to-r from-primary-50 to-white border-primary-100">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-primary-100 rounded-full flex items-center justify-center shadow-sm">
+              <User className="text-primary-600" size={24} />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-gray-900">{caseData.patient_name}</h2>
+              <p className="text-sm text-gray-500">
+                {caseData.sex === 'M' ? 'Male' : 'Female'}, {caseData.age} years
+                {caseData.age_category && <span> ({caseData.age_category})</span>}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant={caseData.outcome === 'Alive' ? 'success' : 'destructive'} className="text-sm px-3 py-1">
+                {caseData.outcome}
+              </Badge>
+            </div>
           </div>
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">{caseData.patient_name}</h2>
-            <p className="text-sm text-gray-500">
-              {caseData.sex === 'M' ? 'Male' : 'Female'}, {caseData.age} years ({caseData.age_category})
-            </p>
-          </div>
-          <div className="ml-auto">
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${caseData.outcome === 'Alive' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-              {caseData.outcome}
-            </span>
-          </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Location */}
-        <div className="card">
-          <div className="flex items-center gap-2 mb-4">
-            <MapPin size={18} className="text-primary-600" />
-            <h3 className="font-semibold">Location Information</h3>
-          </div>
-          <dl className="space-y-3">
-            <DetailItem label="Reporting Region" value={caseData.reporting_region} />
-            <DetailItem label="Zone" value={caseData.zone} />
-            <DetailItem label="Woreda" value={caseData.woreda} />
-            <DetailItem label="Reporting HF" value={caseData.reporting_hf} />
-            <DetailItem label="Kebele" value={caseData.kebele} />
-            <DetailItem label="House No" value={caseData.house_no} />
-            <DetailItem label="Mobile Phone" value={caseData.mobile_phone} />
-          </dl>
-        </div>
+        <SectionCard icon={MapPin} title="Location Information">
+          <DetailItem label="Reporting Region" value={caseData.reporting_region} />
+          <DetailItem label="Zone" value={caseData.zone} />
+          <DetailItem label="Woreda" value={caseData.woreda} />
+          <DetailItem label="Reporting HF" value={caseData.reporting_hf} />
+          <DetailItem label="Kebele" value={caseData.kebele} />
+          <DetailItem label="House No" value={caseData.house_no} />
+          <DetailItem label="Mobile Phone" value={caseData.mobile_phone} />
+        </SectionCard>
 
-        {/* Clinical Dates */}
-        <div className="card">
-          <div className="flex items-center gap-2 mb-4">
-            <Calendar size={18} className="text-primary-600" />
-            <h3 className="font-semibold">Clinical Dates</h3>
-          </div>
-          <dl className="space-y-3">
-            <DetailItem label="Admission Type" value={caseData.admission_type} />
-            <DetailItem label="Date of Onset" value={caseData.date_of_onset} />
-            <DetailItem label="Date Seen" value={caseData.date_seen} />
-            <DetailItem label="Epi-Week" value={caseData.epi_week?.toString()} />
-          </dl>
-        </div>
+        <SectionCard icon={Calendar} title="Clinical Dates">
+          <DetailItem label="Admission Type" value={caseData.admission_type} />
+          <DetailItem label="Date of Onset" value={caseData.date_of_onset} />
+          <DetailItem label="Date Seen" value={caseData.date_seen} />
+          <DetailItem label="Epi-Week" value={caseData.epi_week?.toString()} />
+          <DetailItem label="Created At" value={new Date(caseData.created_at).toLocaleString()} />
+          <DetailItem label="Updated At" value={new Date(caseData.updated_at).toLocaleString()} />
+        </SectionCard>
 
-        {/* Symptoms */}
-        <div className="card">
-          <div className="flex items-center gap-2 mb-4">
-            <Stethoscope size={18} className="text-primary-600" />
-            <h3 className="font-semibold">Signs & Symptoms</h3>
-          </div>
-          <dl className="space-y-3">
-            <DetailItem label="Fever" value={caseData.fever} />
-            <DetailItem label="Headache" value={caseData.headache} />
-            <DetailItem label="Joint Pain" value={caseData.joint_pain} />
-            <DetailItem label="Chills & Rigor" value={caseData.chills_rigor} />
-            <DetailItem label="Vomiting" value={caseData.vomiting} />
-            <DetailItem label="Back Pain" value={caseData.back_pain} />
-            <DetailItem label="Other Symptoms" value={caseData.other_symptoms} />
-          </dl>
-        </div>
+        <SectionCard icon={Stethoscope} title="Signs &amp; Symptoms">
+          <DetailItem label="Fever" value={caseData.fever} />
+          <DetailItem label="Headache" value={caseData.headache} />
+          <DetailItem label="Joint Pain" value={caseData.joint_pain} />
+          <DetailItem label="Chills &amp; Rigor" value={caseData.chills_rigor} />
+          <DetailItem label="Vomiting" value={caseData.vomiting} />
+          <DetailItem label="Back Pain" value={caseData.back_pain} />
+          <DetailItem label="Other Symptoms" value={caseData.other_symptoms} />
+        </SectionCard>
 
-        {/* Lab & Diagnosis */}
-        <div className="card">
-          <div className="flex items-center gap-2 mb-4">
-            <TestTube size={18} className="text-primary-600" />
-            <h3 className="font-semibold">Laboratory & Diagnosis</h3>
-          </div>
-          <dl className="space-y-3">
-            <DetailItem label="Specimen Taken" value={caseData.specimen_taken} />
-            <DetailItem label="Haemoparasite Species" value={caseData.haemoparasite_spp} />
-            <DetailItem label="Travel to Malaria Area" value={caseData.travel_to_malaria_area} />
-          </dl>
-        </div>
+        <SectionCard icon={TestTube} title="Laboratory &amp; Diagnosis">
+          <DetailItem label="Specimen Taken" value={caseData.specimen_taken} />
+          <DetailItem label="Haemoparasite Species" value={caseData.haemoparasite_spp} />
+          <DetailItem label="Travel to Malaria Area" value={caseData.travel_to_malaria_area} />
+        </SectionCard>
 
-        {/* Travel */}
-        <div className="card">
-          <div className="flex items-center gap-2 mb-4">
-            <Plane size={18} className="text-primary-600" />
-            <h3 className="font-semibold">Travel History</h3>
-          </div>
-          <dl className="space-y-3">
-            <DetailItem label="Travel History" value={caseData.travel_history} />
-            <DetailItem label="Source of Infection" value={caseData.source_of_infection} />
-          </dl>
-        </div>
+        <SectionCard icon={Plane} title="Travel History">
+          <DetailItem label="Travel History" value={caseData.travel_history} />
+          <DetailItem label="Source of Infection" value={caseData.source_of_infection} />
+        </SectionCard>
 
-        {/* Outcome */}
-        <div className="card">
-          <div className="flex items-center gap-2 mb-4">
-            <Heart size={18} className="text-primary-600" />
-            <h3 className="font-semibold">Outcome & Follow-up</h3>
-          </div>
-          <dl className="space-y-3">
-            <DetailItem label="Outcome" value={caseData.outcome} />
-            <DetailItem label="FTAT Done" value={caseData.ftat_done} />
-            <DetailItem label="Referred Facility" value={caseData.referred_facility} />
-          </dl>
-        </div>
+        <SectionCard icon={Heart} title="Outcome &amp; Follow-up">
+          <DetailItem label="Outcome" value={caseData.outcome} />
+          <DetailItem label="FTAT Done" value={caseData.ftat_done} />
+          <DetailItem label="Referred Facility" value={caseData.referred_facility} />
+        </SectionCard>
       </div>
     </div>
   );

@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Shield, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../../services/api';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
+import { Card } from '../ui/card';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../ui/table';
 
 export default function AuditLog() {
   const [logs, setLogs] = useState<any[]>([]);
@@ -22,54 +26,81 @@ export default function AuditLog() {
 
   const totalPages = Math.ceil(total / limit);
 
+  const getActionVariant = (action: string): 'default' | 'secondary' | 'destructive' | 'success' | 'warning' => {
+    switch (action) {
+      case 'login': return 'success';
+      case 'create': return 'default';
+      case 'update': return 'warning';
+      case 'delete': return 'destructive';
+      case 'report': return 'secondary';
+      default: return 'secondary';
+    }
+  };
+
   return (
     <div>
-      <h1 className="page-title mb-6">Audit Log</h1>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Audit Log</h1>
+        <p className="text-sm text-gray-500 mt-1">Track all system activity and changes ({total} records)</p>
+      </div>
 
-      <div className="card overflow-hidden p-0">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="px-4 py-3 text-left font-medium text-gray-600">Timestamp</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600">User</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600">Action</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600">Entity</th>
-              <th className="px-4 py-3 text-left font-medium text-gray-600">Details</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
+      <Card className="overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Timestamp</TableHead>
+              <TableHead>User</TableHead>
+              <TableHead>Action</TableHead>
+              <TableHead>Entity</TableHead>
+              <TableHead className="max-w-md">Details</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {loading ? (
-              <tr><td colSpan={5} className="px-4 py-12 text-center text-gray-500">Loading...</td></tr>
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-12 text-gray-500">Loading...</TableCell>
+              </TableRow>
             ) : logs.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-12 text-center text-gray-500">No audit logs found</td></tr>
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-12 text-gray-500">No audit logs found</TableCell>
+              </TableRow>
             ) : logs.map((log) => (
-              <tr key={log.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-gray-500">{new Date(log.created_at).toLocaleString()}</td>
-                <td className="px-4 py-3 font-medium">{log.full_name || log.username}</td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                    log.action === 'login' ? 'bg-green-100 text-green-700' :
-                    log.action === 'delete' ? 'bg-red-100 text-red-700' :
-                    'bg-blue-100 text-blue-700'
-                  }`}>{log.action}</span>
-                </td>
-                <td className="px-4 py-3 text-gray-600">{log.entity_type} #{log.entity_id || '-'}</td>
-                <td className="px-4 py-3 text-gray-500 max-w-xs truncate">{log.details}</td>
-              </tr>
+              <TableRow key={log.id}>
+                <TableCell className="text-gray-500 text-xs whitespace-nowrap">
+                  {new Date(log.created_at).toLocaleString()}
+                </TableCell>
+                <TableCell className="font-medium">{log.full_name || log.username}</TableCell>
+                <TableCell>
+                  <Badge variant={getActionVariant(log.action)} className="rounded-full capitalize">
+                    {log.action}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-gray-600">
+                  <span className="text-xs font-medium text-gray-400">{log.entity_type}</span>
+                  {log.entity_id && <span className="text-gray-600"> #{log.entity_id}</span>}
+                </TableCell>
+                <TableCell className="text-gray-500 max-w-md truncate text-xs">{log.details}</TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t">
-            <p className="text-sm text-gray-500">Page {page} of {totalPages}</p>
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50/50">
+            <p className="text-sm text-gray-500">
+              Page <span className="font-medium">{page}</span> of <span className="font-medium">{totalPages}</span>
+            </p>
             <div className="flex items-center gap-1">
-              <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="p-2 hover:bg-gray-100 rounded disabled:opacity-50"><ChevronLeft size={16} /></button>
-              <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="p-2 hover:bg-gray-100 rounded disabled:opacity-50"><ChevronRight size={16} /></button>
+              <Button variant="outline" size="icon" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
+                <ChevronLeft size={16} />
+              </Button>
+              <Button variant="outline" size="icon" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}>
+                <ChevronRight size={16} />
+              </Button>
             </div>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }

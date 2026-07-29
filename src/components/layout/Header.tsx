@@ -3,6 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { api } from '../../services/api';
 import { getPendingCount, syncPendingCases } from '../../services/db';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 
 export default function Header() {
   const { user } = useAuth();
@@ -138,96 +140,119 @@ export default function Header() {
     }
   };
 
+  const getTypeVariant = (type: string): 'default' | 'secondary' | 'destructive' | 'success' | 'warning' => {
+    switch (type) {
+      case 'alert': return 'destructive';
+      case 'warning': return 'warning';
+      default: return 'default';
+    }
+  };
+
   return (
-    <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-end gap-3">
+    <header className="bg-white border-b border-gray-200 px-4 lg:px-6 py-3 flex items-center justify-end gap-3 sticky top-0 z-30">
+      {/* Online/Offline Status */}
       <div className="flex items-center gap-2">
         {isOnline ? (
-          <span className="inline-flex items-center gap-1 text-xs text-green-600 font-medium">
-            <Wifi size={12} />
+          <Badge variant="success" className="gap-1.5 text-xs px-2 py-0.5 rounded-full">
+            <Wifi size={10} />
             Online
-          </span>
+          </Badge>
         ) : (
-          <span className="inline-flex items-center gap-1 text-xs text-amber-600 font-medium">
-            <WifiOff size={12} />
+          <Badge variant="warning" className="gap-1.5 text-xs px-2 py-0.5 rounded-full">
+            <WifiOff size={10} />
             Offline
-          </span>
+          </Badge>
         )}
       </div>
 
-      <span className="text-xs text-gray-500 hidden md:block">
-        {user?.role?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-      </span>
+      {/* Role Badge */}
+      <Badge variant="secondary" className="hidden md:inline-flex text-xs px-3 py-0.5 rounded-full capitalize">
+        {user?.role?.replace(/_/g, ' ')}
+      </Badge>
 
+      {/* Sync Button */}
       <div className="relative">
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={handleSync}
           disabled={syncing || !isOnline}
-          className={`p-2 rounded-lg hover:bg-gray-100 relative ${syncing ? 'animate-spin' : ''} ${!isOnline ? 'opacity-50 cursor-not-allowed' : ''}`}
+          className={`relative ${syncing ? 'animate-spin pointer-events-none' : ''}`}
           title={pendingCount > 0 ? `Sync ${pendingCount} pending case(s)` : 'Sync data'}
         >
           <RefreshCw size={18} className="text-gray-600" />
           {pendingCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-blue-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
+            <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-blue-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold ring-2 ring-white shadow-sm">
               {pendingCount > 9 ? '9+' : pendingCount}
             </span>
           )}
-        </button>
+        </Button>
         {syncResult && (
-          <div className="absolute right-0 top-full mt-2 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-50">
+          <div className="absolute right-0 top-full mt-2 px-3 py-1.5 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap z-50 shadow-lg animate-in slide-in-from-top-1 duration-200">
             {syncResult}
           </div>
         )}
       </div>
 
+      {/* Notifications */}
       <div className="relative" ref={dropdownRef}>
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={toggleNotifications}
-          className="p-2 rounded-lg hover:bg-gray-100 relative"
+          className="relative"
           title="Notifications"
         >
           <Bell size={18} className="text-gray-600" />
           {unreadCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold">
+            <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold ring-2 ring-white shadow-sm">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
-        </button>
+        </Button>
 
         {showNotifications && (
-          <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-lg border border-gray-200 z-50 max-h-96 overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b">
-              <h3 className="font-semibold text-sm">Notifications</h3>
+          <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50 max-h-96 overflow-hidden animate-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/50">
+              <h3 className="font-semibold text-sm text-gray-900">Notifications</h3>
               <div className="flex items-center gap-2">
                 {unreadCount > 0 && (
-                  <button onClick={markAllRead} className="text-xs text-primary-600 hover:text-primary-700 flex items-center gap-1">
-                    <CheckCheck size={14} /> Mark all read
-                  </button>
+                  <Button variant="ghost" size="sm" onClick={markAllRead} className="text-xs gap-1 h-auto px-2 py-1 text-primary-600">
+                    <CheckCheck size={12} /> Mark all read
+                  </Button>
                 )}
-                <button onClick={() => setShowNotifications(false)} className="p-1 hover:bg-gray-100 rounded">
-                  <X size={14} />
-                </button>
+                <Button variant="ghost" size="icon" onClick={() => setShowNotifications(false)} className="w-6 h-6">
+                  <X size={12} />
+                </Button>
               </div>
             </div>
-            <div className="overflow-y-auto max-h-72">
+            <div className="overflow-y-auto max-h-72 divide-y divide-gray-100">
               {notifications.length === 0 ? (
-                <p className="p-4 text-center text-gray-500 text-sm">No notifications</p>
+                <div className="p-8 text-center">
+                  <Bell size={24} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-gray-500 text-sm">No notifications</p>
+                </div>
               ) : (
                 notifications.map((n) => (
                   <div
                     key={n.id}
                     onClick={() => !n.is_read && markAsRead(n.id)}
-                    className={`px-4 py-3 border-b cursor-pointer hover:bg-gray-50 transition-colors ${!n.is_read ? 'bg-primary-50/50' : ''}`}
+                    className={`px-4 py-3 cursor-pointer transition-all duration-150 hover:bg-gray-50 ${
+                      !n.is_read ? 'bg-primary-50/40 border-l-2 border-l-primary-500' : 'border-l-2 border-l-transparent'
+                    }`}
                   >
-                    <div className="flex items-start gap-2">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${getTypeColor(n.type)}`}>
+                    <div className="flex items-start gap-3">
+                      <Badge variant={getTypeVariant(n.type)} className="rounded text-[10px] px-1.5 py-0 flex-shrink-0 mt-0.5">
                         {n.type.toUpperCase()}
-                      </span>
+                      </Badge>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{n.title}</p>
-                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
-                        <p className="text-[10px] text-gray-400 mt-1">{new Date(n.created_at).toLocaleString()}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2 leading-relaxed">{n.message}</p>
+                        <p className="text-[10px] text-gray-400 mt-1.5 font-medium">{new Date(n.created_at).toLocaleString()}</p>
                       </div>
-                      {!n.is_read && <div className="w-2 h-2 bg-primary-500 rounded-full mt-1.5 flex-shrink-0" />}
+                      {!n.is_read && (
+                        <span className="w-2 h-2 bg-primary-500 rounded-full mt-2 flex-shrink-0 shadow-sm" />
+                      )}
                     </div>
                   </div>
                 ))

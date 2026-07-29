@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { AlertTriangle, CheckCircle, Info, TrendingUp, BarChart3 } from 'lucide-react';
 import { api } from '../../services/api';
+import { Card, CardContent } from '../ui/card';
+import { Badge } from '../ui/badge';
 
 interface QualityIssue {
   type: 'error' | 'warning' | 'info';
@@ -123,80 +125,98 @@ export default function DataQuality() {
 
   const getBg = (type: string) => {
     switch (type) {
-      case 'error': return 'bg-red-50 border-red-200';
-      case 'warning': return 'bg-amber-50 border-amber-200';
-      default: return 'bg-blue-50 border-blue-200';
+      case 'error': return 'border-l-4 border-l-red-500 bg-red-50 border-red-200';
+      case 'warning': return 'border-l-4 border-l-amber-500 bg-amber-50 border-amber-200';
+      default: return 'border-l-4 border-l-blue-500 bg-blue-50 border-blue-200';
     }
   };
 
   return (
     <div>
-      <h1 className="page-title mb-6">Data Quality Monitor</h1>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Data Quality Monitor</h1>
+        <p className="text-sm text-gray-500 mt-1">Validate and monitor malaria case data completeness and consistency</p>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
+        <Card className="shadow-sm">
+          <CardContent className="p-5 flex items-center gap-3">
+            <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center shadow-sm">
               <CheckCircle className="text-primary-600" size={24} />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Total Cases</p>
-              <p className="text-2xl font-bold">{totalCases.toLocaleString()}</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Total Cases</p>
+              <p className="text-2xl font-bold text-gray-900">{totalCases.toLocaleString()}</p>
             </div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardContent className="p-5 flex items-center gap-3">
+            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center shadow-sm">
               <TrendingUp className="text-blue-600" size={24} />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Completeness</p>
-              <p className="text-2xl font-bold">{completenessScore}%</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Completeness</p>
+              <p className="text-2xl font-bold text-gray-900">{completenessScore}%</p>
             </div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center">
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardContent className="p-5 flex items-center gap-3">
+            <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center shadow-sm">
               <AlertTriangle className="text-red-600" size={24} />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Errors</p>
-              <p className="text-2xl font-bold">{stats.errors}</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Errors</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.errors}</p>
             </div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center">
+          </CardContent>
+        </Card>
+        <Card className="shadow-sm">
+          <CardContent className="p-5 flex items-center gap-3">
+            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center shadow-sm">
               <BarChart3 className="text-amber-600" size={24} />
             </div>
             <div>
-              <p className="text-sm text-gray-500">Warnings</p>
-              <p className="text-2xl font-bold">{stats.warnings}</p>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Warnings</p>
+              <p className="text-2xl font-bold text-gray-900">{stats.warnings}</p>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-12"><div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" /></div>
+        <div className="flex justify-center py-12">
+          <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
+        </div>
       ) : (
         <div className="space-y-3">
           {issues.map((issue, i) => (
             <div key={i} className={`flex items-center gap-4 p-4 rounded-lg border ${getBg(issue.type)}`}>
-              {getIcon(issue.type)}
-              <div className="flex-1">
+              <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center">
+                {getIcon(issue.type)}
+              </div>
+              <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900">{issue.message}</p>
+                {issue.field && (
+                  <p className="text-xs text-gray-500 mt-0.5">Field: <code className="bg-gray-200/50 px-1 rounded">{issue.field}</code></p>
+                )}
               </div>
               {issue.count > 0 && (
-                <span className="px-3 py-1 bg-white rounded-full text-sm font-semibold shadow-sm">{issue.count}</span>
+                <Badge variant="secondary" className="rounded-full text-sm px-3 py-1">
+                  {issue.count}
+                </Badge>
               )}
             </div>
           ))}
           {issues.length === 0 && (
-            <div className="text-center py-12 text-gray-500">No data quality issues found</div>
+            <Card>
+              <CardContent className="py-12 text-center">
+                <CheckCircle size={32} className="mx-auto text-green-500 mb-3" />
+                <p className="text-gray-500 font-medium">No data quality issues found</p>
+                <p className="text-xs text-gray-400 mt-1">All cases have complete and valid data</p>
+              </CardContent>
+            </Card>
           )}
         </div>
       )}

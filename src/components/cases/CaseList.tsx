@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Search, Filter, Download, Upload, Trash2, Edit, Eye, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
+import { Search, Filter, Download, Upload, Trash2, Edit, Eye, ChevronLeft, ChevronRight, FileSpreadsheet, X } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import * as XLSX from 'xlsx';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Badge } from '../ui/badge';
+import { Card, CardContent } from '../ui/card';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../ui/table';
 
 export default function CaseList() {
   const navigate = useNavigate();
@@ -141,153 +146,192 @@ export default function CaseList() {
   return (
     <div>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-        <h1 className="page-title">Malaria Cases ({total})</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Malaria Cases</h1>
+          <p className="text-sm text-gray-500 mt-1">{total} case{total !== 1 ? 's' : ''} recorded</p>
+        </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowImport(true)} className="btn-secondary flex items-center gap-2 text-sm">
-            <Upload size={16} /> Import
-          </button>
-          <button onClick={handleExport} className="btn-secondary flex items-center gap-2 text-sm">
-            <Download size={16} /> Export
-          </button>
-          <button onClick={() => navigate('/cases/new')} className="btn-primary flex items-center gap-2 text-sm">
+          <Button variant="outline" size="sm" onClick={() => setShowImport(true)} className="gap-2">
+            <Upload size={14} /> Import
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
+            <Download size={14} /> Export
+          </Button>
+          <Button size="sm" onClick={() => navigate('/cases/new')} className="gap-2">
             + New Case
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Search & Filters */}
-      <div className="card mb-4">
-        <div className="flex flex-col md:flex-row gap-3">
-          <div className="flex-1 relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by patient name..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="input-field pl-9"
-            />
+      <Card className="mb-4">
+        <CardContent className="p-4">
+          <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex-1 relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search by patient name..."
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                className="pl-9"
+              />
+            </div>
+            <Button variant={showFilters ? 'default' : 'outline'} size="sm" onClick={() => setShowFilters(!showFilters)} className="gap-2">
+              <Filter size={14} /> Filters
+            </Button>
           </div>
-          <button onClick={() => setShowFilters(!showFilters)} className="btn-secondary flex items-center gap-2 text-sm">
-            <Filter size={16} /> Filters
-          </button>
-        </div>
 
-        {showFilters && (
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mt-4 pt-4 border-t">
-            <div>
-              <label className="label">Region</label>
-              <input type="text" value={filters.region} onChange={(e) => setFilters({ ...filters, region: e.target.value })} className="input-field text-sm" />
+          {showFilters && (
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mt-4 pt-4 border-t border-gray-200">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Region</label>
+                <Input type="text" value={filters.region} onChange={(e) => setFilters({ ...filters, region: e.target.value })} className="text-sm" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Zone</label>
+                <Input type="text" value={filters.zone} onChange={(e) => setFilters({ ...filters, zone: e.target.value })} className="text-sm" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Woreda</label>
+                <Input type="text" value={filters.woreda} onChange={(e) => setFilters({ ...filters, woreda: e.target.value })} className="text-sm" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">From Date</label>
+                <Input type="date" value={filters.date_from} onChange={(e) => setFilters({ ...filters, date_from: e.target.value })} className="text-sm" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">To Date</label>
+                <Input type="date" value={filters.date_to} onChange={(e) => setFilters({ ...filters, date_to: e.target.value })} className="text-sm" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Outcome</label>
+                <select value={filters.outcome} onChange={(e) => setFilters({ ...filters, outcome: e.target.value })} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500">
+                  <option value="">All</option>
+                  <option value="Alive">Alive</option>
+                  <option value="Death">Death</option>
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="label">Zone</label>
-              <input type="text" value={filters.zone} onChange={(e) => setFilters({ ...filters, zone: e.target.value })} className="input-field text-sm" />
-            </div>
-            <div>
-              <label className="label">Woreda</label>
-              <input type="text" value={filters.woreda} onChange={(e) => setFilters({ ...filters, woreda: e.target.value })} className="input-field text-sm" />
-            </div>
-            <div>
-              <label className="label">From Date</label>
-              <input type="date" value={filters.date_from} onChange={(e) => setFilters({ ...filters, date_from: e.target.value })} className="input-field text-sm" />
-            </div>
-            <div>
-              <label className="label">To Date</label>
-              <input type="date" value={filters.date_to} onChange={(e) => setFilters({ ...filters, date_to: e.target.value })} className="input-field text-sm" />
-            </div>
-            <div>
-              <label className="label">Outcome</label>
-              <select value={filters.outcome} onChange={(e) => setFilters({ ...filters, outcome: e.target.value })} className="select-field text-sm">
-                <option value="">All</option>
-                <option value="Alive">Alive</option>
-                <option value="Death">Death</option>
-              </select>
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Cases Table */}
-      <div className="card overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Patient</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Sex</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Age</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Epi-Week</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Facility</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Date Seen</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Species</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600">Outcome</th>
-                <th className="px-4 py-3 text-right font-medium text-gray-600">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {loading ? (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-500">Loading...</td></tr>
-              ) : cases.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-500">No cases found</td></tr>
-              ) : cases.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{c.patient_name}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${c.sex === 'M' ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>{c.sex}</span>
-                  </td>
-                  <td className="px-4 py-3">{c.age}</td>
-                  <td className="px-4 py-3">{c.epi_week}</td>
-                  <td className="px-4 py-3 text-gray-600">{c.facility_name || c.reporting_hf}</td>
-                  <td className="px-4 py-3 text-gray-600">{c.date_seen}</td>
-                  <td className="px-4 py-3">
-                    {c.haemoparasite_spp && (
-                      <span className="px-2 py-0.5 rounded-full text-xs bg-yellow-100 text-yellow-700 font-medium">{c.haemoparasite_spp}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${c.outcome === 'Alive' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{c.outcome}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-1">
-                      <Link to={`/cases/${c.id}`} className="p-1.5 hover:bg-gray-100 rounded text-gray-500"><Eye size={15} /></Link>
-                      <Link to={`/cases/edit/${c.id}`} className="p-1.5 hover:bg-gray-100 rounded text-gray-500"><Edit size={15} /></Link>
-                      <button onClick={() => handleDelete(c.id)} className="p-1.5 hover:bg-red-50 rounded text-red-500"><Trash2 size={15} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <Card className="overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Patient</TableHead>
+              <TableHead>Sex</TableHead>
+              <TableHead>Age</TableHead>
+              <TableHead>Epi-Week</TableHead>
+              <TableHead>Facility</TableHead>
+              <TableHead>Date Seen</TableHead>
+              <TableHead>Species</TableHead>
+              <TableHead>Outcome</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center py-12 text-gray-500">Loading...</TableCell>
+              </TableRow>
+            ) : cases.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={9} className="text-center py-12 text-gray-500">No cases found</TableCell>
+              </TableRow>
+            ) : cases.map((c) => (
+              <TableRow key={c.id}>
+                <TableCell className="font-medium">{c.patient_name}</TableCell>
+                <TableCell>
+                  <Badge variant={c.sex === 'M' ? 'default' : 'secondary'} className="rounded-full">
+                    {c.sex}
+                  </Badge>
+                </TableCell>
+                <TableCell>{c.age}</TableCell>
+                <TableCell className="text-gray-600">{c.epi_week}</TableCell>
+                <TableCell className="text-gray-600 max-w-[150px] truncate">{c.facility_name || c.reporting_hf}</TableCell>
+                <TableCell className="text-gray-600">{c.date_seen}</TableCell>
+                <TableCell>
+                  {c.haemoparasite_spp && (
+                    <Badge variant="warning" className="rounded-full">{c.haemoparasite_spp}</Badge>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={c.outcome === 'Alive' ? 'success' : 'destructive'} className="rounded-full">
+                    {c.outcome}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <Link to={`/cases/${c.id}`} className="p-1.5 hover:bg-gray-100 rounded text-gray-500 transition-colors"><Eye size={15} /></Link>
+                    <Link to={`/cases/edit/${c.id}`} className="p-1.5 hover:bg-gray-100 rounded text-gray-500 transition-colors"><Edit size={15} /></Link>
+                    <button onClick={() => handleDelete(c.id)} className="p-1.5 hover:bg-red-50 rounded text-red-500 transition-colors"><Trash2 size={15} /></button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t">
-            <p className="text-sm text-gray-500">Showing {((page - 1) * limit) + 1}-{Math.min(page * limit, total)} of {total}</p>
+          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50/50">
+            <p className="text-sm text-gray-500">
+              Showing <span className="font-medium">{((page - 1) * limit) + 1}</span> to <span className="font-medium">{Math.min(page * limit, total)}</span> of{' '}
+              <span className="font-medium">{total}</span> cases
+            </p>
             <div className="flex items-center gap-1">
-              <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="p-2 hover:bg-gray-100 rounded disabled:opacity-50"><ChevronLeft size={16} /></button>
+              <Button variant="outline" size="icon" onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}>
+                <ChevronLeft size={16} />
+              </Button>
               {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                 const p = i + 1;
                 return (
-                  <button key={p} onClick={() => setPage(p)} className={`w-8 h-8 rounded text-sm font-medium ${page === p ? 'bg-primary-600 text-white' : 'hover:bg-gray-100'}`}>{p}</button>
+                  <Button
+                    key={p}
+                    variant={page === p ? 'default' : 'outline'}
+                    size="icon"
+                    onClick={() => setPage(p)}
+                    className="w-8 h-8"
+                  >
+                    {p}
+                  </Button>
                 );
               })}
-              <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="p-2 hover:bg-gray-100 rounded disabled:opacity-50"><ChevronRight size={16} /></button>
+              <Button variant="outline" size="icon" onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}>
+                <ChevronRight size={16} />
+              </Button>
             </div>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Import Modal */}
       {showImport && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold mb-4">Import Excel File</h3>
-            <p className="text-sm text-gray-600 mb-4">Upload an Excel file with malaria case data. Column headers should match the standard format.</p>
-            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center mb-4">
-              <FileSpreadsheet size={40} className="mx-auto text-gray-400 mb-3" />
-              <input type="file" accept=".xlsx,.xls,.csv" onChange={handleImport} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100" />
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">Import Excel File</h3>
+              <button onClick={() => setShowImport(false)} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                <X size={18} className="text-gray-500" />
+              </button>
             </div>
-            <button onClick={() => setShowImport(false)} className="btn-secondary w-full">Cancel</button>
+            <p className="text-sm text-gray-600 mb-4">Upload an Excel file with malaria case data. Column headers should match the standard format.</p>
+            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center mb-4 hover:border-primary-300 transition-colors bg-gray-50/50">
+              <FileSpreadsheet size={40} className="mx-auto text-gray-400 mb-3" />
+              <p className="text-xs text-gray-500 mb-3">Supported formats: .xlsx, .xls, .csv</p>
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleImport}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 file:cursor-pointer cursor-pointer transition-colors"
+              />
+            </div>
+            <Button variant="outline" onClick={() => setShowImport(false)} className="w-full">
+              Cancel
+            </Button>
           </div>
         </div>
       )}
