@@ -7,5 +7,4 @@ dist
 *.db-wal
 *.db-shm
 .DS_Store
-server/seed.js
 server/seed-db.js
