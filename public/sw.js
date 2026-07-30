@@ -31,6 +31,9 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Skip non-http/https requests (e.g. chrome-extension://) — Cache API doesn't support them
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
   if (request.method !== 'GET') return;
   if (url.pathname.startsWith('/@') || url.pathname.includes('vite') || url.search.includes('t=')) return;
 

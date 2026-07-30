@@ -354,6 +354,167 @@ router.delete('/:id', authenticateToken, async (req, res) => {
   }
 });
 
+router.post('/sync', authenticateToken, async (req, res) => {
+  try {
+    const { cases } = req.body;
+    if (!Array.isArray(cases) || cases.length === 0) {
+      return res.status(400).json({ error: 'No cases to sync' });
+    }
+
+    const results = [];
+    for (const c of cases) {
+      try {
+        const clientId = c.client_side_id;
+
+        // Check if a case with this client_side_id already exists
+        if (clientId) {
+          const existing = await queryOne('SELECT id, updated_at FROM malaria_cases WHERE client_side_id = $1', [clientId]);
+
+          if (existing) {
+            // Compare timestamps: server version wins if it's newer, otherwise client version wins
+            const clientUpdated = new Date(c.updated_at || 0).getTime();
+            const serverUpdated = new Date(existing.updated_at || 0).getTime();
+
+            if (clientUpdated > serverUpdated) {
+              // Client version is newer — update the server record
+              const data = c;
+              await run(
+                `UPDATE malaria_cases SET
+                  reporting_region=$1, zone=$2, woreda=$3, reporting_hf=$4, kebele=$5, house_no=$6, mobile_phone=$7,
+                  admission_type=$8, patient_name=$9, sex=$10, age=$11, epi_week=$12, age_category=$13, date_of_onset=$14, date_seen=$15,
+                  fever=$16, headache=$17, joint_pain=$18, chills_rigor=$19, vomiting=$20, back_pain=$21, other_symptoms=$22,
+                  specimen_taken=$23, haemoparasite_spp=$24, travel_history=$25, travel_to_malaria_area=$26,
+                  outcome=$27, ftat_done=$28, referred_facility=$29, source_of_infection=$30, updated_at=NOW()
+                 WHERE id=$31`,
+                [
+                  data.reporting_region, data.zone, data.woreda, data.reporting_hf, data.kebele,
+                  data.house_no, data.mobile_phone, data.admission_type, data.patient_name,
+                  data.sex, data.age, data.epi_week, data.age_category, data.date_of_onset,
+                  data.date_seen, data.fever, data.headache, data.joint_pain, data.chills_rigor,
+                  data.vomiting, data.back_pain, data.other_symptoms, data.specimen_taken,
+                  data.haemoparasite_spp, data.travel_history, data.travel_to_malaria_area,
+                  data.outcome, data.ftat_done, data.referred_facility, data.source_of_infection,
+                  existing.id
+                ]
+              );
+
+              await run(
+                `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
+                 VALUES ($1, 'update', 'case', $2, $3)`,
+                [req.user.id, existing.id, `Conflict resolved — client overwrote server for ${data.patient_name}`]
+              );
+
+              results.push({ client_side_id: clientId, status: 'updated', server_id: existing.id });
+            } else {
+              // Server version is newer or equal — keep server version
+              results.push({ client_side_id: clientId, status: 'conflict_server_wins', server_id: existing.id });
+            }
+            continue;
+          }
+        }
+
+        // No existing case — create a new one
+        const facilityId = c.facility_id || req.user.facility_id;
+        if (!facilityId) {
+          results.push({ client_side_id: clientId, status: 'error', error: 'No facility assigned' });
+          continue;
+        }
+
+        const facility = await queryOne('SELECT * FROM facilities WHERE id = $1', [facilityId]);
+        if (!facility) {
+          results.push({ client_side_id: clientId, status: 'error', error: 'Invalid facility' });
+          continue;
+        }
+
+        // Enforce data scope for all roles
+        if (req.user.role === 'facility_user' || req.user.role === 'facility_admin') {
+          if (facilityId !== req.user.facility_id) {
+            results.push({ client_side_id: clientId, status: 'error', error: 'Facility mismatch' });
+            continue;
+          }
+        } else if (req.user.role === 'district_admin') {
+          if (facility.woreda !== req.user.woreda) {
+            results.push({ client_side_id: clientId, status: 'error', error: 'Facility outside your district' });
+            continue;
+          }
+        } else if (req.user.role === 'zone_admin') {
+          if (facility.zone !== req.user.zone) {
+            results.push({ client_side_id: clientId, status: 'error', error: 'Facility outside your zone' });
+            continue;
+          }
+        } else if (req.user.role === 'region_admin') {
+          if (facility.region !== req.user.region) {
+            results.push({ client_side_id: clientId, status: 'error', error: 'Facility outside your region' });
+            continue;
+          }
+        }
+
+        const result = await runReturning(
+          `INSERT INTO malaria_cases (
+            client_side_id, facility_id, reporting_region, zone, woreda, reporting_hf, kebele, house_no, mobile_phone,
+            admission_type, patient_name, sex, age, epi_week, age_category, date_of_onset, date_seen,
+            fever, headache, joint_pain, chills_rigor, vomiting, back_pain, other_symptoms,
+            specimen_taken, haemoparasite_spp, travel_history, travel_to_malaria_area,
+            outcome, ftat_done, referred_facility, source_of_infection, created_by
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33) RETURNING id`,
+          [
+            clientId || '',
+            facilityId,
+            c.reporting_region || facility.region || '',
+            c.zone || facility.zone || '',
+            c.woreda || facility.woreda || '',
+            c.reporting_hf || facility.name || '',
+            c.kebele || facility.kebele || '',
+            c.house_no || '',
+            c.mobile_phone || '',
+            c.admission_type || 'Out-Patient',
+            c.patient_name,
+            c.sex,
+            c.age,
+            c.epi_week || getCurrentEpiWeek(),
+            c.age_category || '',
+            c.date_of_onset || '',
+            c.date_seen || new Date().toISOString().split('T')[0],
+            c.fever || 'No',
+            c.headache || 'No',
+            c.joint_pain || 'No',
+            c.chills_rigor || 'No',
+            c.vomiting || 'No',
+            c.back_pain || 'No',
+            c.other_symptoms || '',
+            c.specimen_taken || 'No',
+            c.haemoparasite_spp || '',
+            c.travel_history || '',
+            c.travel_to_malaria_area || 'No',
+            c.outcome || 'Alive',
+            c.ftat_done || 'No',
+            c.referred_facility || '',
+            c.source_of_infection || '',
+            req.user.id
+          ]
+        );
+
+        await run(
+          `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
+           VALUES ($1, 'create', 'case', $2, $3)`,
+          [req.user.id, result.id, `Synced case for ${c.patient_name}`]
+        );
+
+        results.push({ client_side_id: clientId, status: 'created', server_id: result.id });
+      } catch (e) {
+        results.push({ client_side_id: c.client_side_id, status: 'error', error: e.message });
+      }
+    }
+
+    res.json({
+      message: `Synced ${results.filter(r => r.status === 'created').length} created, ${results.filter(r => r.status === 'updated').length} updated, ${results.filter(r => r.status === 'conflict_server_wins').length} conflicts (server kept)`,
+      results,
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Sync failed', details: err.message });
+  }
+});
+
 router.post('/import', authenticateToken, async (req, res) => {
   try {
     const { cases } = req.body;
@@ -361,17 +522,57 @@ router.post('/import', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'No cases to import' });
     }
 
-    const facilityId = req.user.facility_id;
-    if (!facilityId && req.user.role === 'facility_user') {
+    const userFacilityId = req.user.facility_id;
+    if (!userFacilityId && req.user.role === 'facility_user') {
       return res.status(403).json({ error: 'No facility assigned' });
     }
 
-    const facility = facilityId ? await queryOne('SELECT * FROM facilities WHERE id = $1', [facilityId]) : null;
+    const userFacility = userFacilityId ? await queryOne('SELECT * FROM facilities WHERE id = $1', [userFacilityId]) : null;
 
+    // Pre-validate all rows for facility scope
+    const errors = [];
     let imported = 0;
+
     for (const c of cases) {
       try {
-        const cFacilityId = c.facility_id || facilityId;
+        // Determine the facility for this row
+        let cFacilityId = c.facility_id ? parseInt(c.facility_id) : null;
+        if (!cFacilityId) cFacilityId = userFacilityId;
+
+        if (!cFacilityId) {
+          errors.push(`Row for "${c.patient_name || 'unknown'}": no facility specified`);
+          continue;
+        }
+
+        // Verify facility exists
+        const rowFacility = await queryOne('SELECT id, name, region, zone, woreda FROM facilities WHERE id = $1', [cFacilityId]);
+        if (!rowFacility) {
+          errors.push(`Row for "${c.patient_name || 'unknown'}": facility ID ${cFacilityId} not found`);
+          continue;
+        }
+
+        // Enforce facility scope
+        if (req.user.role === 'facility_user' || req.user.role === 'facility_admin') {
+          if (cFacilityId !== req.user.facility_id) {
+            errors.push(`Row for "${c.patient_name || 'unknown'}": cannot import to facility ID ${cFacilityId} — you are assigned to facility ID ${req.user.facility_id}`);
+            continue;
+          }
+        }
+
+        // For district_admin+, verify the facility is in their scope
+        if (req.user.role === 'district_admin' && rowFacility.woreda !== req.user.woreda) {
+          errors.push(`Row for "${c.patient_name || 'unknown'}": facility is outside your district`);
+          continue;
+        }
+        if (req.user.role === 'zone_admin' && rowFacility.zone !== req.user.zone) {
+          errors.push(`Row for "${c.patient_name || 'unknown'}": facility is outside your zone`);
+          continue;
+        }
+        if (req.user.role === 'region_admin' && rowFacility.region !== req.user.region) {
+          errors.push(`Row for "${c.patient_name || 'unknown'}": facility is outside your region`);
+          continue;
+        }
+
         await run(
           `INSERT INTO malaria_cases (
             facility_id, reporting_region, zone, woreda, reporting_hf, kebele, house_no, mobile_phone,
@@ -381,9 +582,9 @@ router.post('/import', authenticateToken, async (req, res) => {
             outcome, ftat_done, referred_facility, source_of_infection, created_by
           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32)`,
           [
-            cFacilityId, c.reporting_region || facility?.region || '', c.zone || facility?.zone || '',
-            c.woreda || facility?.woreda || '', c.reporting_hf || facility?.name || '',
-            c.kebele || facility?.kebele || '', c.house_no || '',
+            cFacilityId, c.reporting_region || rowFacility.region || '', c.zone || rowFacility.zone || '',
+            c.woreda || rowFacility.woreda || '', c.reporting_hf || rowFacility.name || '',
+            c.kebele || rowFacility.kebele || '', c.house_no || '',
             c.mobile_phone || '', c.admission_type || 'Out-Patient', c.patient_name || '',
             c.sex || 'M', c.age || 0, c.epi_week || getCurrentEpiWeek(), c.age_category || '',
             c.date_of_onset || '', c.date_seen || '', c.fever || 'No', c.headache || 'No',
@@ -395,16 +596,22 @@ router.post('/import', authenticateToken, async (req, res) => {
           ]
         );
         imported++;
-      } catch (e) { /* skip invalid rows */ }
+      } catch (e) {
+        errors.push(`Row for "${c.patient_name || 'unknown'}": ${e.message}`);
+      }
     }
 
     await run(
       `INSERT INTO audit_logs (user_id, action, entity_type, details)
        VALUES ($1, 'import', 'case', $2)`,
-      [req.user.id, `Imported ${imported} cases from Excel`]
+      [req.user.id, `Imported ${imported} cases from Excel (${errors.length} errors)`]
     );
 
-    res.json({ message: `Successfully imported ${imported} cases`, imported });
+    res.json({
+      message: `Successfully imported ${imported} cases${errors.length > 0 ? ` with ${errors.length} error(s)` : ''}`,
+      imported,
+      errors: errors.length > 0 ? errors.slice(0, 20) : undefined,
+    });
   } catch (err) {
     res.status(500).json({ error: 'Import failed', details: err.message });
   }

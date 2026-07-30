@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit, Trash2, Building2, X, Save } from 'lucide-react';
 import { api } from '../../services/api';
+import { cacheFacilities } from '../../services/db';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -24,6 +25,8 @@ export default function FacilityManagement() {
     try {
       const data = await api.getFacilities();
       setFacilities(data);
+      // Refresh the offline facility cache
+      cacheFacilities(data).catch(() => {});
     } catch (e) {} finally { setLoading(false); }
   };
 

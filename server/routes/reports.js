@@ -4,10 +4,59 @@ import { authenticateToken, buildDataScope, requireMinRole } from '../middleware
 
 const router = Router();
 
+function computeDateRange(type) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth(); // 0-based
+
+  switch (type) {
+    case 'daily': {
+      const dateStr = now.toISOString().split('T')[0];
+      return { date_from: dateStr, date_to: dateStr };
+    }
+    case 'weekly': {
+      // Monday of current week
+      const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon...
+      const monday = new Date(now);
+      monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7)); // go back to Monday
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      return {
+        date_from: monday.toISOString().split('T')[0],
+        date_to: sunday.toISOString().split('T')[0],
+      };
+    }
+    case 'monthly': {
+      const first = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+      const last = `${y}-${String(m + 1).padStart(2, '0')}-${new Date(y, m + 1, 0).getDate()}`;
+      return { date_from: first, date_to: last };
+    }
+    case 'quarterly': {
+      const quarter = Math.floor(m / 3); // 0,1,2,3
+      const qStart = `${y}-${String(quarter * 3 + 1).padStart(2, '0')}-01`;
+      const qEndMonth = quarter * 3 + 3; // 3,6,9,12
+      const qEnd = `${y}-${String(qEndMonth).padStart(2, '0')}-${new Date(y, qEndMonth, 0).getDate()}`;
+      return { date_from: qStart, date_to: qEnd };
+    }
+    case 'annual': {
+      return { date_from: `${y}-01-01`, date_to: `${y}-12-31` };
+    }
+    default:
+      return { date_from: '', date_to: '' };
+  }
+}
+
 router.get('/generate', authenticateToken, async (req, res) => {
   try {
-    const { type = 'weekly', date_from, date_to, region, zone, woreda, facility_id } = req.query;
+    let { type = 'weekly', date_from, date_to, region, zone, woreda, facility_id } = req.query;
     const scope = buildDataScope(req.user);
+
+    // Auto-compute date range from type if no explicit dates given
+    if (!date_from && !date_to) {
+      const range = computeDateRange(type);
+      date_from = range.date_from;
+      date_to = range.date_to;
+    }
 
     let where = 'WHERE 1=1';
     const params = [];

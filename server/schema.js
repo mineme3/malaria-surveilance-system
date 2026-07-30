@@ -36,6 +36,7 @@ export async function initDatabase() {
   await sql`
     CREATE TABLE IF NOT EXISTS malaria_cases (
       id SERIAL PRIMARY KEY,
+      client_side_id TEXT UNIQUE DEFAULT '',
       facility_id INTEGER NOT NULL REFERENCES facilities(id),
       reporting_region TEXT DEFAULT '',
       zone TEXT DEFAULT '',
@@ -73,6 +74,13 @@ export async function initDatabase() {
       sync_status TEXT DEFAULT 'synced'
     )
   `;
+
+  // Add client_side_id column if it doesn't exist (migration for existing databases)
+  // Note: added WITHOUT UNIQUE to avoid conflicts with existing empty-string rows
+  try {
+    await sql`ALTER TABLE malaria_cases ADD COLUMN IF NOT EXISTS client_side_id TEXT DEFAULT ''`;
+    await sql`CREATE INDEX IF NOT EXISTS idx_cases_client_id ON malaria_cases(client_side_id)`;
+  } catch (e) { /* column already exists or index already exists */ }
 
   await sql`
     CREATE TABLE IF NOT EXISTS audit_logs (

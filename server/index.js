@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { initDatabase } from './schema.js';
+import { seedDatabase } from './seed.js';
 import authRoutes from './routes/auth.js';
 import facilityRoutes from './routes/facilities.js';
 import caseRoutes from './routes/cases.js';
@@ -67,6 +68,8 @@ async function startServer() {
   try {
     console.log('Initializing database...');
     await initDatabase();
+
+    await seedDatabase();
 
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Server running on port ${PORT}`);

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Save, ArrowLeft, CheckCircle, WifiOff, Cloud, AlertCircle, MapPin, User, Calendar, Stethoscope, TestTube, Plane, Heart } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
-import { saveCaseOffline, getPendingCount, syncPendingCases } from '../../services/db';
+import { saveCaseOffline, getPendingCount, syncPendingCases, cacheFacilities, getCachedFacilities } from '../../services/db';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -113,8 +113,8 @@ export default function CaseForm() {
 
   const autoSyncPending = useCallback(async () => {
     try {
-      const result = await syncPendingCases((data) => api.createCase(data));
-      if (result.synced > 0) {
+      const result = await syncPendingCases((data) => api.syncCases(data));
+      if (result.synced > 0 || result.conflicts > 0) {
         setPendingCount(result.remaining);
         window.dispatchEvent(new CustomEvent('sync-complete', { detail: result }));
       }
@@ -125,6 +125,8 @@ export default function CaseForm() {
     try {
       const data = await api.getFacilities();
       setFacilities(data);
+      // Cache facilities for offline use
+      cacheFacilities(data).catch(() => {});
       if (!id && user?.facility_id) {
         setFormData((prev) => ({ ...prev, facility_id: user.facility_id!.toString() }));
         const fac = data.find((f: any) => f.id === user.facility_id);
@@ -140,7 +142,15 @@ export default function CaseForm() {
           }));
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      // API failed — try loading from IndexedDB cache
+      try {
+        const cached = await getCachedFacilities();
+        if (cached.length > 0) {
+          setFacilities(cached);
+        }
+      } catch (cacheErr) {}
+    }
   };
 
   const loadCase = async () => {
@@ -245,7 +255,19 @@ export default function CaseForm() {
       setSuccess(true);
       setTimeout(() => navigate('/cases'), 1500);
     } catch (err: any) {
-      if (!navigator.onLine) {
+      // Check if this is a network error (server unreachable) vs a validation error
+      // navigator.onLine is unreliable — it's true when the browser has internet
+      // even if the backend server is down. We detect network errors by checking
+      // the error type/message.
+      const isNetworkError = err instanceof TypeError ||
+        (err.message && (
+          err.message.includes('Failed to fetch') ||
+          err.message.includes('NetworkError') ||
+          err.message.includes('Network request failed')
+        ));
+
+      if (isNetworkError) {
+        // Server unreachable — save offline
         try {
           const payload = {
             ...formData,
@@ -262,6 +284,7 @@ export default function CaseForm() {
           setErrors({ submit: 'Failed to save case offline' });
         }
       } else {
+        // Server returned an error (validation, auth, etc.) — show the message
         setErrors({ submit: err.message || 'Failed to save' });
       }
     } finally {

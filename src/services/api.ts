@@ -126,6 +126,13 @@ class ApiService {
     });
   }
 
+  async syncCases(cases: any[]) {
+    return this.request('/cases/sync', {
+      method: 'POST',
+      body: JSON.stringify({ cases }),
+    });
+  }
+
   async exportCases(params: Record<string, string> = {}) {
     const query = new URLSearchParams(params).toString();
     return this.request(`/cases/export?${query}`);

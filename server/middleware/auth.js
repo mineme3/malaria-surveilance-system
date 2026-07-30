@@ -96,7 +96,9 @@ export function canModifyCase(user, caseRecord) {
   if (user.role === 'system_admin' || user.role === 'region_admin') return true;
   if (user.role === 'zone_admin' && caseRecord.zone === user.zone) return true;
   if (user.role === 'district_admin' && caseRecord.woreda === user.woreda) return true;
-  if ((user.role === 'facility_admin' || user.role === 'facility_user') && caseRecord.facility_id === user.facility_id) return true;
+  if (user.role === 'facility_admin' && caseRecord.facility_id === user.facility_id) return true;
+  // Facility users can only modify cases they created themselves
+  if (user.role === 'facility_user' && caseRecord.created_by === user.id && caseRecord.facility_id === user.facility_id) return true;
   return false;
 }
 

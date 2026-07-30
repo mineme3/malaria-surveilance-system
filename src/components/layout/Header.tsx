@@ -99,11 +99,14 @@ export default function Header() {
     if (pendingCount === 0) return;
     setSyncing(true);
     try {
-      const result = await syncPendingCases((data) => api.createCase(data));
+      const result = await syncPendingCases((data) => api.syncCases(data));
       setPendingCount(result.remaining);
-      if (result.synced > 0) {
-        setSyncResult(`Synced ${result.synced} case(s)`);
-        setTimeout(() => setSyncResult(null), 3000);
+      if (result.synced > 0 || result.conflicts > 0) {
+        const parts: string[] = [];
+        if (result.synced > 0) parts.push(`${result.synced} synced`);
+        if (result.conflicts > 0) parts.push(`${result.conflicts} conflicts (server kept)`);
+        setSyncResult(parts.join(', '));
+        setTimeout(() => setSyncResult(null), 4000);
       }
     } catch (e) {} finally {
       setSyncing(false);
@@ -114,16 +117,21 @@ export default function Header() {
     if (!isOnline) return;
     setSyncing(true);
     try {
-      const result = await syncPendingCases((data) => api.createCase(data));
+      const result = await syncPendingCases((data) => api.syncCases(data));
       setPendingCount(result.remaining);
-      if (result.synced > 0) {
-        setSyncResult(`Synced ${result.synced} case(s)`);
+      const parts: string[] = [];
+      if (result.synced > 0) parts.push(`${result.synced} synced`);
+      if (result.conflicts > 0) parts.push(`${result.conflicts} conflicts (server kept)`);
+      if (result.failed > 0) parts.push(`${result.failed} failed`);
+
+      if (parts.length > 0) {
+        setSyncResult(parts.join(', '));
       } else if (result.remaining === 0) {
         setSyncResult('All data is up to date');
       } else {
         setSyncResult(`${result.remaining} case(s) pending`);
       }
-      setTimeout(() => setSyncResult(null), 3000);
+      setTimeout(() => setSyncResult(null), 4000);
     } catch (e) {
       setSyncResult('Sync failed');
       setTimeout(() => setSyncResult(null), 3000);
@@ -182,7 +190,7 @@ export default function Header() {
         >
           <RefreshCw size={18} className="text-gray-600" />
           {pendingCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-blue-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold ring-2 ring-white shadow-sm">
+            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-blue-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold ring-2 ring-white shadow-sm">
               {pendingCount > 9 ? '9+' : pendingCount}
             </span>
           )}
@@ -205,7 +213,7 @@ export default function Header() {
         >
           <Bell size={18} className="text-gray-600" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 w-4.5 h-4.5 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold ring-2 ring-white shadow-sm">
+            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold ring-2 ring-white shadow-sm">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
