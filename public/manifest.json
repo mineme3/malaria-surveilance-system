@@ -1,12 +1,16 @@
 {
   "name": "Malaria Surveillance System",
   "short_name": "MalariaSS",
-  "description": "Malaria Line List Data Collection, Surveillance, Analytics, and Reporting",
+  "description": "Malaria Line List Data Collection, Surveillance, Analytics, and Reporting - PWA for offline-capable disease surveillance",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f0fdf4",
   "theme_color": "#16a34a",
   "orientation": "any",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["health", "medical", "utilities"],
   "icons": [
     {
       "src": "/icons/icon-192.svg",
@@ -19,6 +23,27 @@
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "/dashboard",
+      "description": "View surveillance dashboard"
+    },
+    {
+      "name": "New Case",
+      "short_name": "New Case",
+      "url": "/cases/new",
+      "description": "Report a new malaria case"
+    },
+    {
+      "name": "Reports",
+      "short_name": "Reports",
+      "url": "/reports",
+      "description": "Generate reports"
     }
   ]
 }

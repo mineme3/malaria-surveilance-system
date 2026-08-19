@@ -12,6 +12,7 @@ import DataQuality from './components/dataquality/DataQuality';
 import AuditLog from './components/notifications/AuditLog';
 import UserManagement from './components/notifications/UserManagement';
 import SendAlert from './components/notifications/SendAlert';
+import DataGeneration from './components/dataquality/DataGeneration';
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
           <Route path="facilities" element={<ProtectedRoute roles={['system_admin','region_admin','zone_admin','district_admin']}><FacilityManagement /></ProtectedRoute>} />
           <Route path="reports" element={<Reports />} />
           <Route path="data-quality" element={<DataQuality />} />
+          <Route path="generate-data" element={<ProtectedRoute roles={['system_admin']}><DataGeneration /></ProtectedRoute>} />
           <Route path="audit" element={<ProtectedRoute roles={['system_admin']}><AuditLog /></ProtectedRoute>} />
           <Route path="users" element={<ProtectedRoute roles={['system_admin']}><UserManagement /></ProtectedRoute>} />
           <Route path="alerts" element={<ProtectedRoute roles={['system_admin','region_admin','zone_admin']}><SendAlert /></ProtectedRoute>} />

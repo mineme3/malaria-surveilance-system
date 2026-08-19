@@ -1,10 +1,13 @@
-const CACHE_NAME = 'malaria-pwa-v2';
-const API_CACHE = 'malaria-api-v1';
+const CACHE_NAME = 'malaria-pwa-v3';
+const API_CACHE = 'malaria-api-v2';
 
 const STATIC_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
+  '/offline.html',
+  '/icons/icon-192.svg',
+  '/icons/icon-512.svg',
 ];
 
 self.addEventListener('install', (event) => {
@@ -31,12 +34,11 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-http/https requests (e.g. chrome-extension://) — Cache API doesn't support them
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
-
   if (request.method !== 'GET') return;
   if (url.pathname.startsWith('/@') || url.pathname.includes('vite') || url.search.includes('t=')) return;
 
+  // API requests: network-first with cache fallback
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(request)
@@ -52,6 +54,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Static assets: stale-while-revalidate
   event.respondWith(
     caches.match(request).then((cached) => {
       const fetched = fetch(request)
@@ -65,7 +68,7 @@ self.addEventListener('fetch', (event) => {
         .catch(() => {
           if (cached) return cached;
           if (request.mode === 'navigate') {
-            return caches.match('/index.html');
+            return caches.match('/offline.html');
           }
           return new Response('Offline', {
             status: 503,
@@ -77,6 +80,7 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+// Background sync for offline cases
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-cases') {
     event.waitUntil(
@@ -91,6 +95,51 @@ self.addEventListener('sync', (event) => {
       })()
     );
   }
+});
+
+// Push notification support
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+
+  const data = event.data.json();
+  const options = {
+    body: data.body || data.message || 'New notification',
+    icon: '/icons/icon-192.svg',
+    badge: '/icons/icon-192.svg',
+    vibrate: [100, 50, 100],
+    data: { url: data.url || '/dashboard' },
+    actions: [
+      { action: 'open', title: 'Open', icon: '/icons/icon-192.svg' },
+      { action: 'dismiss', title: 'Dismiss', icon: '/icons/icon-192.svg' },
+    ],
+    tag: data.tag || 'malaria-notification',
+    renotify: true,
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Malaria Surveillance', options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  if (event.action === 'dismiss') return;
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          client.focus();
+          client.navigate(event.notification.data?.url || '/dashboard');
+          return;
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(event.notification.data?.url || '/dashboard');
+      }
+    })
+  );
 });
 
 self.addEventListener('message', (event) => {

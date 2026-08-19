@@ -2,7 +2,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, FilePlus, ClipboardList, Building2,
   BarChart3, Shield, Activity, Menu, X,
-  LogOut, User, Send, ChevronRight
+  LogOut, User, Send, ChevronRight, Database
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
@@ -18,6 +18,7 @@ const navItems = [
   { to: '/audit', icon: Shield, label: 'Audit Log', minRole: 'system_admin' },
   { to: '/users', icon: User, label: 'User Management', minRole: 'system_admin' },
   { to: '/alerts', icon: Send, label: 'Send Alert', minRole: 'zone_admin' },
+  { to: '/generate-data', icon: Database, label: 'Generate Data', minRole: 'system_admin' },
 ];
 
 const ROLE_LEVELS: Record<string, number> = {

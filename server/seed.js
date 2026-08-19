@@ -294,8 +294,9 @@ export async function seedDatabase() {
     const allUsers = await sql`SELECT id FROM users ORDER BY id`;
     const notificationTemplates = [
       { title: 'Weekly Report Available', message: 'The epi week 31 surveillance report is now available for review.', type: 'info' },
-      { title: 'Data Import Complete', message: 'Bulk import of 25 case records has been completed successfully.', type: 'success' },
-      { title: 'Unusual Case Pattern Detected', message: 'An increase in P. falciparum cases detected in Gurgura woreda. Please investigate.', type: 'warning' },
+      { title: 'Data Import Complete', message: 'Bulk import of 25 case records has been completed successfully.', type: 'info' },
+      { title: 'Threshold Alert: Case Increase', message: 'An increase in P. falciparum cases detected in Gurgura woreda. Please investigate.', type: 'threshold' },
+      { title: 'Action Threshold: Death Spike', message: 'Multiple death cases reported this week. Immediate investigation required.', type: 'action_threshold' },
       { title: 'System Maintenance', message: 'Planned system maintenance on Sunday at 2:00 AM. The system will be unavailable for 1 hour.', type: 'info' },
     ];
     for (const notif of notificationTemplates) {

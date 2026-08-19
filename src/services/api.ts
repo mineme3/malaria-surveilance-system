@@ -170,6 +170,13 @@ class ApiService {
       body: JSON.stringify(data),
     });
   }
+
+  async generateData(count: number = 20) {
+    return this.request('/cases/generate', {
+      method: 'POST',
+      body: JSON.stringify({ count }),
+    });
+  }
 }
 
 export const api = new ApiService();

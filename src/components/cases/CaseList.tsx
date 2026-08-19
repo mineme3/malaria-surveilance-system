@@ -20,14 +20,20 @@ export default function CaseList() {
   const [search, setSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [facilities, setFacilities] = useState<any[]>([]);
   const [filters, setFilters] = useState({
-    region: '', zone: '', woreda: '', date_from: '', date_to: '', sex: '', outcome: '',
+    region: '', zone: '', woreda: '', kebele: '', date_from: '', date_to: '',
+    sex: '', outcome: '', age_category: '', admission_type: '', haemoparasite_spp: '', facility_id: '', epi_week: '',
   });
   const limit = 20;
 
   useEffect(() => {
     loadCases();
   }, [page, search, filters]);
+
+  useEffect(() => {
+    api.getFacilities().then((data) => setFacilities(Array.isArray(data) ? data : data.facilities || [])).catch(() => {});
+  }, []);
 
   const loadCases = async () => {
     setLoading(true);
@@ -141,6 +147,17 @@ export default function CaseList() {
     } catch (e) {}
   };
 
+  const clearFilters = () => {
+    setFilters({
+      region: '', zone: '', woreda: '', kebele: '', date_from: '', date_to: '',
+      sex: '', outcome: '', age_category: '', admission_type: '', haemoparasite_spp: '', facility_id: '', epi_week: '',
+    });
+    setSearch('');
+    setPage(1);
+  };
+
+  const activeFilterCount = Object.values(filters).filter((v) => v !== '').length + (search ? 1 : 0);
+
   const totalPages = Math.ceil(total / limit);
 
   return (
@@ -178,38 +195,94 @@ export default function CaseList() {
               />
             </div>
             <Button variant={showFilters ? 'default' : 'outline'} size="sm" onClick={() => setShowFilters(!showFilters)} className="gap-2">
-              <Filter size={14} /> Filters
+              <Filter size={14} /> Filters {activeFilterCount > 0 && <Badge className="ml-1 px-1.5 py-0 text-[10px]">{activeFilterCount}</Badge>}
             </Button>
+            {activeFilterCount > 0 && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-2 text-red-500 hover:text-red-600 hover:bg-red-50">
+                <X size={14} /> Clear
+              </Button>
+            )}
           </div>
 
           {showFilters && (
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mt-4 pt-4 border-t border-gray-200">
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mt-4 pt-4 border-t border-gray-200">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-600">Region</label>
-                <Input type="text" value={filters.region} onChange={(e) => setFilters({ ...filters, region: e.target.value })} className="text-sm" />
+                <Input type="text" value={filters.region} onChange={(e) => { setFilters({ ...filters, region: e.target.value }); setPage(1); }} className="text-sm" placeholder="Filter region" />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-600">Zone</label>
-                <Input type="text" value={filters.zone} onChange={(e) => setFilters({ ...filters, zone: e.target.value })} className="text-sm" />
+                <Input type="text" value={filters.zone} onChange={(e) => { setFilters({ ...filters, zone: e.target.value }); setPage(1); }} className="text-sm" placeholder="Filter zone" />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-600">Woreda</label>
-                <Input type="text" value={filters.woreda} onChange={(e) => setFilters({ ...filters, woreda: e.target.value })} className="text-sm" />
+                <Input type="text" value={filters.woreda} onChange={(e) => { setFilters({ ...filters, woreda: e.target.value }); setPage(1); }} className="text-sm" placeholder="Filter woreda" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Kebele</label>
+                <Input type="text" value={filters.kebele} onChange={(e) => { setFilters({ ...filters, kebele: e.target.value }); setPage(1); }} className="text-sm" placeholder="Filter kebele" />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-600">From Date</label>
-                <Input type="date" value={filters.date_from} onChange={(e) => setFilters({ ...filters, date_from: e.target.value })} className="text-sm" />
+                <Input type="date" value={filters.date_from} onChange={(e) => { setFilters({ ...filters, date_from: e.target.value }); setPage(1); }} className="text-sm" />
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-600">To Date</label>
-                <Input type="date" value={filters.date_to} onChange={(e) => setFilters({ ...filters, date_to: e.target.value })} className="text-sm" />
+                <Input type="date" value={filters.date_to} onChange={(e) => { setFilters({ ...filters, date_to: e.target.value }); setPage(1); }} className="text-sm" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Epi-Week</label>
+                <Input type="number" value={filters.epi_week} onChange={(e) => { setFilters({ ...filters, epi_week: e.target.value }); setPage(1); }} className="text-sm" placeholder="Week #" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Sex</label>
+                <select value={filters.sex} onChange={(e) => { setFilters({ ...filters, sex: e.target.value }); setPage(1); }} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500">
+                  <option value="">All</option>
+                  <option value="M">Male</option>
+                  <option value="F">Female</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Age Category</label>
+                <select value={filters.age_category} onChange={(e) => { setFilters({ ...filters, age_category: e.target.value }); setPage(1); }} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500">
+                  <option value="">All</option>
+                  <option value="Under 5">Under 5</option>
+                  <option value="5-14">5-14</option>
+                  <option value="15-49">15-49</option>
+                  <option value="50+">50+</option>
+                </select>
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-gray-600">Outcome</label>
-                <select value={filters.outcome} onChange={(e) => setFilters({ ...filters, outcome: e.target.value })} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500">
+                <select value={filters.outcome} onChange={(e) => { setFilters({ ...filters, outcome: e.target.value }); setPage(1); }} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500">
                   <option value="">All</option>
                   <option value="Alive">Alive</option>
                   <option value="Death">Death</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Admission</label>
+                <select value={filters.admission_type} onChange={(e) => { setFilters({ ...filters, admission_type: e.target.value }); setPage(1); }} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500">
+                  <option value="">All</option>
+                  <option value="Out-Patient">Out-Patient</option>
+                  <option value="In-Patient">In-Patient</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Species</label>
+                <select value={filters.haemoparasite_spp} onChange={(e) => { setFilters({ ...filters, haemoparasite_spp: e.target.value }); setPage(1); }} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500">
+                  <option value="">All</option>
+                  <option value="P. falciparum">P. falciparum</option>
+                  <option value="P. vivax">P. vivax</option>
+                  <option value="P. ovale">P. ovale</option>
+                  <option value="Mixed infection">Mixed infection</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-gray-600">Facility</label>
+                <select value={filters.facility_id} onChange={(e) => { setFilters({ ...filters, facility_id: e.target.value }); setPage(1); }} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500">
+                  <option value="">All</option>
+                  {facilities.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
               </div>
             </div>
@@ -227,6 +300,7 @@ export default function CaseList() {
               <TableHead>Age</TableHead>
               <TableHead>Epi-Week</TableHead>
               <TableHead>Facility</TableHead>
+              <TableHead>Kebele</TableHead>
               <TableHead>Date Seen</TableHead>
               <TableHead>Species</TableHead>
               <TableHead>Outcome</TableHead>
@@ -236,11 +310,11 @@ export default function CaseList() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-12 text-gray-500">Loading...</TableCell>
+                <TableCell colSpan={10} className="text-center py-12 text-gray-500">Loading...</TableCell>
               </TableRow>
             ) : cases.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-12 text-gray-500">No cases found</TableCell>
+                <TableCell colSpan={10} className="text-center py-12 text-gray-500">No cases found</TableCell>
               </TableRow>
             ) : cases.map((c) => (
               <TableRow key={c.id}>
@@ -252,7 +326,8 @@ export default function CaseList() {
                 </TableCell>
                 <TableCell>{c.age}</TableCell>
                 <TableCell className="text-gray-600">{c.epi_week}</TableCell>
-                <TableCell className="text-gray-600 max-w-[150px] truncate">{c.facility_name || c.reporting_hf}</TableCell>
+                <TableCell className="text-gray-600 max-w-[120px] truncate">{c.facility_name || c.reporting_hf}</TableCell>
+                <TableCell className="text-gray-600 text-xs">{c.kebele}</TableCell>
                 <TableCell className="text-gray-600">{c.date_seen}</TableCell>
                 <TableCell>
                   {c.haemoparasite_spp && (

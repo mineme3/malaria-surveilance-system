@@ -82,7 +82,7 @@ export interface Notification {
   user_id: number;
   title: string;
   message: string;
-  type: 'info' | 'warning' | 'alert';
+  type: 'info' | 'threshold' | 'action_threshold';
   is_read: boolean;
   created_at: string;
 }

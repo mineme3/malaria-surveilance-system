@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Send, AlertTriangle, Info, CheckCircle } from 'lucide-react';
+import { Send, AlertTriangle, Info, AlertCircle } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -7,7 +7,7 @@ export default function SendAlert() {
   const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
-  const [type, setType] = useState('warning');
+  const [type, setType] = useState('info');
   const [targetRole, setTargetRole] = useState('');
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -35,35 +35,36 @@ export default function SendAlert() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="page-title mb-6">Send Alert / Notification</h1>
+      <h1 className="text-2xl font-bold text-gray-900 tracking-tight mb-6">Send Alert / Notification</h1>
 
-      <div className="card">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
         <div className="space-y-4">
           <div>
-            <label className="label">Alert Type</label>
+            <label className="text-sm font-medium text-gray-700 block mb-2">Alert Type</label>
             <div className="flex gap-3">
               {[
-                { value: 'info', label: 'Info', icon: Info, color: 'bg-blue-100 text-blue-700' },
-                { value: 'warning', label: 'Warning', icon: AlertTriangle, color: 'bg-amber-100 text-amber-700' },
-                { value: 'alert', label: 'Critical', icon: AlertTriangle, color: 'bg-red-100 text-red-700' },
+                { value: 'info', label: 'Info', icon: Info, color: 'bg-blue-100 text-blue-700 border-blue-300', desc: 'General information' },
+                { value: 'threshold', label: 'Threshold', icon: AlertTriangle, color: 'bg-amber-100 text-amber-700 border-amber-300', desc: 'Threshold exceeded' },
+                { value: 'action_threshold', label: 'Action Threshold', icon: AlertCircle, color: 'bg-red-100 text-red-700 border-red-300', desc: 'Immediate action required' },
               ].map((opt) => (
                 <button
                   key={opt.value}
                   onClick={() => setType(opt.value)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                    type === opt.value ? opt.color + ' ring-2 ring-offset-1' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  className={`flex flex-col items-center gap-1 px-4 py-3 rounded-lg text-sm font-medium transition-all border ${
+                    type === opt.value ? opt.color + ' ring-2 ring-offset-1 shadow-sm' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
                   }`}
                 >
-                  <opt.icon size={16} />
-                  {opt.label}
+                  <opt.icon size={18} />
+                  <span>{opt.label}</span>
+                  <span className="text-[10px] font-normal opacity-70">{opt.desc}</span>
                 </button>
               ))}
             </div>
           </div>
 
           <div>
-            <label className="label">Target Audience</label>
-            <select value={targetRole} onChange={(e) => setTargetRole(e.target.value)} className="select-field">
+            <label className="text-sm font-medium text-gray-700 block mb-2">Target Audience</label>
+            <select value={targetRole} onChange={(e) => setTargetRole(e.target.value)} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500">
               <option value="">All users in your scope</option>
               <option value="facility_user">Facility Users</option>
               <option value="facility_admin">Facility Admins</option>
@@ -73,13 +74,13 @@ export default function SendAlert() {
           </div>
 
           <div>
-            <label className="label">Title *</label>
-            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="input-field" placeholder="Alert title" />
+            <label className="text-sm font-medium text-gray-700 block mb-2">Title *</label>
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="flex h-9 w-full rounded-md border border-gray-300 bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500" placeholder="Alert title" />
           </div>
 
           <div>
-            <label className="label">Message *</label>
-            <textarea value={message} onChange={(e) => setMessage(e.target.value)} className="input-field" rows={5} placeholder="Describe the alert or notification..." />
+            <label className="text-sm font-medium text-gray-700 block mb-2">Message *</label>
+            <textarea value={message} onChange={(e) => setMessage(e.target.value)} className="flex w-full rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary-500 min-h-[100px]" placeholder="Describe the alert or notification..." />
           </div>
 
           {result && (
@@ -91,7 +92,7 @@ export default function SendAlert() {
           <button
             onClick={handleSend}
             disabled={sending || !title || !message}
-            className="btn-primary flex items-center gap-2"
+            className="flex items-center gap-2 px-4 py-2.5 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {sending ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

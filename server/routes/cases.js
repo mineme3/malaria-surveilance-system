@@ -25,7 +25,7 @@ async function createAlert(user, type, title, message) {
 
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { page = 1, limit = 50, search, region, zone, woreda, date_from, date_to, sex, age_category, outcome, facility_id, epi_week } = req.query;
+    const { page = 1, limit = 50, search, region, zone, woreda, kebele, date_from, date_to, sex, age_category, outcome, facility_id, epi_week, admission_type, haemoparasite_spp } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     const scope = buildDataScope(req.user);
 
@@ -53,6 +53,9 @@ router.get('/', authenticateToken, async (req, res) => {
     if (outcome) { where += ` AND c.outcome = $${paramIndex++}`; params.push(outcome); }
     if (facility_id) { where += ` AND c.facility_id = $${paramIndex++}`; params.push(parseInt(facility_id)); }
     if (epi_week) { where += ` AND c.epi_week = $${paramIndex++}`; params.push(parseInt(epi_week)); }
+    if (kebele) { where += ` AND c.kebele = $${paramIndex++}`; params.push(kebele); }
+    if (admission_type) { where += ` AND c.admission_type = $${paramIndex++}`; params.push(admission_type); }
+    if (haemoparasite_spp) { where += ` AND c.haemoparasite_spp = $${paramIndex++}`; params.push(haemoparasite_spp); }
 
     const totalResult = await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${where}`, params);
     const total = parseInt(totalResult.count);
@@ -614,6 +617,100 @@ router.post('/import', authenticateToken, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: 'Import failed', details: err.message });
+  }
+});
+
+router.post('/generate', authenticateToken, async (req, res) => {
+  try {
+    if (!['system_admin'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Only system administrators can generate test data' });
+    }
+
+    const { count = 20 } = req.body;
+    const numCases = Math.min(parseInt(count) || 20, 200);
+
+    const facilities = await queryAll('SELECT id, name, region, zone, woreda, kebele FROM facilities WHERE is_active = 1');
+    const users = await queryAll("SELECT id FROM users WHERE role = 'facility_user'");
+
+    if (facilities.length === 0) {
+      return res.status(400).json({ error: 'No facilities found. Seed the database first.' });
+    }
+
+    const firstNamesM = ['Abdi', 'Ahmed', 'Amanuel', 'Berhanu', 'Dawit', 'Elias', 'Fikru', 'Gebre', 'Habtamu', 'Henok', 'Kebede', 'Lemma', 'Mekonnen', 'Samuel', 'Tesfaye'];
+    const firstNamesF = ['Abebech', 'Almaz', 'Asnakech', 'Belaynesh', 'Desta', 'Etenesh', 'Firehiwot', 'Genet', 'Hanna', 'Hirut', 'Kebebush', 'Mekdes', 'Meseret', 'Rahel', 'Saba'];
+    const lastNames = ['Abebe', 'Alemayehu', 'Asfaw', 'Belay', 'Berhe', 'Desta', 'Fikre', 'Gebremedhin', 'Getahun', 'Kahsay', 'Mekonnen', 'Mengistu', 'Mesfin', 'Negash', 'Tesfaye'];
+    const parasiteSpecies = ['P. falciparum', 'P. vivax', 'P. ovale', 'Mixed infection'];
+    const outcomes = ['Alive', 'Alive', 'Alive', 'Alive', 'Alive', 'Alive', 'Alive', 'Death'];
+    const kebeles = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', 'Melka Jebdu', 'Adada', 'Belen'];
+    const symptoms = { fever: 0.92, headache: 0.80, jointPain: 0.65, chills: 0.75, vomiting: 0.30, backPain: 0.25 };
+
+    const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+    const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+    let inserted = 0;
+    for (let i = 0; i < numCases; i++) {
+      const facility = pick(facilities);
+      const user = users.length > 0 ? pick(users) : { id: 1 };
+      const isMale = Math.random() > 0.5;
+      const age = Math.random() < 0.15 ? rand(0, 4) : Math.random() < 0.35 ? rand(5, 14) : Math.random() < 0.85 ? rand(15, 49) : rand(50, 80);
+      const epiWeek = rand(25, 35);
+      const baseDate = new Date(2026, 0, 1 + (epiWeek - 1) * 7 + rand(0, 6));
+      const dateSeen = baseDate.toISOString().split('T')[0];
+      const dateOnset = new Date(baseDate.getTime() - rand(1, 5) * 86400000).toISOString().split('T')[0];
+
+      await run(
+        `INSERT INTO malaria_cases (
+          client_side_id, facility_id, reporting_region, zone, woreda,
+          reporting_hf, kebele, house_no, mobile_phone, admission_type,
+          patient_name, sex, age, epi_week, age_category, date_of_onset, date_seen,
+          fever, headache, joint_pain, chills_rigor, vomiting, back_pain, other_symptoms,
+          specimen_taken, haemoparasite_spp, travel_history, travel_to_malaria_area,
+          outcome, ftat_done, referred_facility, source_of_infection, created_by
+        ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33)`,
+        [
+          `gen-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+          facility.id,
+          facility.region, facility.zone, facility.woreda,
+          facility.name, pick(kebeles), String(rand(1, 999)),
+          Math.random() < 0.4 ? `09${rand(11, 99)}${rand(1000000, 9999999)}` : '',
+          age < 5 || Math.random() < 0.2 ? 'In-Patient' : 'Out-Patient',
+          `${isMale ? pick(firstNamesM) : pick(firstNamesF)} ${pick(lastNames)}`,
+          isMale ? 'M' : 'F',
+          age,
+          epiWeek,
+          age <= 4 ? 'Under 5' : age <= 14 ? '5-14' : age <= 49 ? '15-49' : '50+',
+          dateOnset,
+          dateSeen,
+          Math.random() < symptoms.fever ? 'Yes' : 'No',
+          Math.random() < symptoms.headache ? 'Yes' : 'No',
+          Math.random() < symptoms.jointPain ? 'Yes' : 'No',
+          Math.random() < symptoms.chills ? 'Yes' : 'No',
+          Math.random() < symptoms.vomiting ? 'Yes' : 'No',
+          Math.random() < symptoms.backPain ? 'Yes' : 'No',
+          Math.random() < 0.2 ? pick(['Nausea', 'Diarrhea', 'Abdominal pain', 'Dizziness']) : '',
+          Math.random() < 0.85 ? 'Yes' : 'No',
+          Math.random() < 0.85 ? pick(parasiteSpecies) : '',
+          Math.random() < 0.15 ? 'Traveled to lowland area' : '',
+          Math.random() < 0.15 ? 'Yes' : 'No',
+          pick(outcomes),
+          Math.random() < 0.90 ? 'Yes' : 'No',
+          '',
+          pick(['Community acquired', 'Unknown', 'Travel related', 'Local transmission']),
+          user.id,
+        ]
+      );
+      inserted++;
+    }
+
+    await run(
+      `INSERT INTO audit_logs (user_id, action, entity_type, details)
+       VALUES ($1, 'generate', 'malaria_case', $2)`,
+      [req.user.id, `Generated ${inserted} test malaria cases`]
+    );
+
+    res.json({ message: `Generated ${inserted} test cases`, count: inserted });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to generate data', details: err.message });
   }
 });
 

@@ -3,22 +3,97 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#16a34a" />
     <title>Malaria Surveillance System - Offline</title>
     <style>
-      body { font-family: system-ui, -apple-system, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #f0fdf4; color: #166534; }
-      .container { text-align: center; padding: 2rem; }
-      h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-      p { color: #666; margin-bottom: 1rem; }
-      .icon { font-size: 3rem; margin-bottom: 1rem; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100vh;
+        background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+        color: #166534;
+      }
+      .container {
+        text-align: center;
+        padding: 3rem 2rem;
+        max-width: 400px;
+        background: white;
+        border-radius: 1.5rem;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        margin: 1rem;
+      }
+      .icon {
+        width: 80px;
+        height: 80px;
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        font-size: 2rem;
+      }
+      h1 { font-size: 1.5rem; margin-bottom: 0.75rem; color: #166534; }
+      p { color: #666; margin-bottom: 0.5rem; font-size: 0.9rem; line-height: 1.5; }
+      .features {
+        margin: 1.5rem 0;
+        text-align: left;
+        background: #f0fdf4;
+        border-radius: 0.75rem;
+        padding: 1rem;
+      }
+      .features h3 { font-size: 0.85rem; color: #16a34a; margin-bottom: 0.5rem; }
+      .features ul { list-style: none; }
+      .features li {
+        padding: 0.35rem 0;
+        font-size: 0.8rem;
+        color: #555;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .features li::before { content: "✓"; color: #22c55e; font-weight: bold; }
+      button {
+        padding: 0.75rem 2rem;
+        background: linear-gradient(135deg, #22c55e, #16a34a);
+        color: white;
+        border: none;
+        border-radius: 0.75rem;
+        cursor: pointer;
+        font-size: 1rem;
+        font-weight: 600;
+        margin-top: 1rem;
+        transition: transform 0.2s, box-shadow 0.2s;
+      }
+      button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(34,197,94,0.4); }
+      button:active { transform: translateY(0); }
     </style>
   </head>
   <body>
     <div class="container">
-      <div class="icon">📡</div>
+      <div class="icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+          <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+          <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+          <line x1="12" y1="20" x2="12.01" y2="20"></line>
+        </svg>
+      </div>
       <h1>You are offline</h1>
       <p>Please check your internet connection and try again.</p>
-      <p>Cases saved offline will sync automatically when you&apos;re back online.</p>
-      <button onclick="window.location.reload()" style="padding:0.5rem 1.5rem;background:#16a34a;color:white;border:none;border-radius:0.5rem;cursor:pointer;font-size:1rem;">Retry</button>
+      <div class="features">
+        <h3>Available offline:</h3>
+        <ul>
+          <li>View cached dashboard data</li>
+          <li>Create new case entries</li>
+          <li>View previously loaded cases</li>
+        </ul>
+      </div>
+      <p style="font-size: 0.8rem; color: #888; margin-bottom: 1rem;">Cases saved offline will sync automatically when you're back online.</p>
+      <button onclick="window.location.reload()">Retry Connection</button>
     </div>
   </body>
 </html>

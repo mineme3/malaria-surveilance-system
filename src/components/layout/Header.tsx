@@ -142,16 +142,16 @@ export default function Header() {
 
   const getTypeColor = (type: string) => {
     switch (type) {
-      case 'alert': return 'bg-red-100 text-red-700 border-red-200';
-      case 'warning': return 'bg-amber-100 text-amber-700 border-amber-200';
+      case 'action_threshold': return 'bg-red-100 text-red-700 border-red-200';
+      case 'threshold': return 'bg-amber-100 text-amber-700 border-amber-200';
       default: return 'bg-blue-100 text-blue-700 border-blue-200';
     }
   };
 
   const getTypeVariant = (type: string): 'default' | 'secondary' | 'destructive' | 'success' | 'warning' => {
     switch (type) {
-      case 'alert': return 'destructive';
-      case 'warning': return 'warning';
+      case 'action_threshold': return 'destructive';
+      case 'threshold': return 'warning';
       default: return 'default';
     }
   };
@@ -251,7 +251,7 @@ export default function Header() {
                   >
                     <div className="flex items-start gap-3">
                       <Badge variant={getTypeVariant(n.type)} className="rounded text-[10px] px-1.5 py-0 flex-shrink-0 mt-0.5">
-                        {n.type.toUpperCase()}
+                        {n.type === 'action_threshold' ? 'ACTION' : n.type === 'threshold' ? 'THRESHOLD' : n.type.toUpperCase()}
                       </Badge>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 truncate">{n.title}</p>
