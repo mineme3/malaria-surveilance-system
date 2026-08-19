@@ -97,9 +97,13 @@ export interface DashboardStats {
   facilities_reporting: number;
   cases_by_week: { week: string; count: number }[];
   cases_by_region: { region: string; count: number }[];
+  cases_by_woreda: { woreda: string; count: number }[];
+  cases_by_facility: { facility_name: string; count: number }[];
   cases_by_age: { category: string; count: number }[];
   cases_by_sex: { sex: string; count: number }[];
   species_distribution: { species: string; count: number }[];
+  cases_by_admission: { type: string; count: number }[];
+  recent_trend: { date: string; count: number }[];
 }
 
 export interface Report {
@@ -108,6 +112,10 @@ export interface Report {
   period_start: string;
   period_end: string;
   generated_by: number;
-  data: DashboardStats;
+  data: DashboardStats & {
+    cases_by_kebele: { kebele: string; count: number }[];
+    cases_by_mender: { mender: string; count: number }[];
+    trend_data: { period: string; count: number }[];
+  };
   created_at: string;
 }

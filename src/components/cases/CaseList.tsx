@@ -29,7 +29,13 @@ export default function CaseList() {
 
   useEffect(() => {
     loadCases();
-  }, [page, search, filters]);
+  }, [page, search]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setPage(1);
+    loadCases();
+  }, [JSON.stringify(filters)]);
 
   useEffect(() => {
     api.getFacilities().then((data) => setFacilities(Array.isArray(data) ? data : data.facilities || [])).catch(() => {});
@@ -42,8 +48,8 @@ export default function CaseList() {
       if (search) params.search = search;
       Object.entries(filters).forEach(([k, v]) => { if (v) params[k] = v; });
       const data = await api.getCases(params);
-      setCases(data.cases);
-      setTotal(data.total);
+      setCases(data.cases || []);
+      setTotal(data.total || 0);
     } catch (e) {
     } finally {
       setLoading(false);

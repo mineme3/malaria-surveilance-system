@@ -139,7 +139,7 @@ router.get('/generate', authenticateToken, async (req, res) => {
 
     res.json(report);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to generate report', details: err.message });
+    res.status(500).json({ error: 'Failed to generate report' });
   }
 });
 

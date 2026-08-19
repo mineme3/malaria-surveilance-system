@@ -18,8 +18,20 @@ router.post('/register', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Username, email, password, and full name are required' });
     }
 
-    if (password.length < 6) {
+    if (typeof username !== 'string' || !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
+      return res.status(400).json({ error: 'Username must be 3-30 alphanumeric characters or underscores' });
+    }
+
+    if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    if (typeof password !== 'string' || password.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    if (typeof full_name !== 'string' || full_name.length < 2) {
+      return res.status(400).json({ error: 'Full name must be at least 2 characters' });
     }
 
     const existing = await queryOne('SELECT id FROM users WHERE username = $1 OR email = $2', [username, email]);
@@ -37,7 +49,7 @@ router.post('/register', authenticateToken, async (req, res) => {
     const userAllowedRoles = allowedRoles[req.user.role] || [];
     const targetRole = role || 'facility_user';
     if (!userAllowedRoles.includes(targetRole)) {
-      return res.status(403).json({ error: `You cannot create users with role: ${targetRole}` });
+      return res.status(403).json({ error: 'Insufficient permissions for this role' });
     }
 
     let userRegion = region || req.user.region;
@@ -55,7 +67,7 @@ router.post('/register', authenticateToken, async (req, res) => {
       userRegion = req.user.region;
     }
 
-    const hash = bcrypt.hashSync(password, 10);
+    const hash = await bcrypt.hash(password, 10);
     const result = await runReturning(
       `INSERT INTO users (username, email, password_hash, full_name, role, facility_id, region, zone, woreda)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
@@ -70,7 +82,7 @@ router.post('/register', authenticateToken, async (req, res) => {
 
     res.status(201).json({ message: 'User registered successfully', userId: result.id });
   } catch (err) {
-    res.status(500).json({ error: 'Registration failed', details: err.message });
+    res.status(500).json({ error: 'Registration failed' });
   }
 });
 
@@ -87,7 +99,8 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    if (!bcrypt.compareSync(password, user.password_hash)) {
+    const validPassword = await bcrypt.compare(password, user.password_hash);
+    if (!validPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -106,7 +119,7 @@ router.post('/login', async (req, res) => {
     const { password_hash, ...userWithoutPassword } = user;
     res.json({ token, user: userWithoutPassword });
   } catch (err) {
-    res.status(500).json({ error: 'Login failed', details: err.message });
+    res.status(500).json({ error: 'Login failed' });
   }
 });
 
@@ -174,7 +187,7 @@ router.put('/users/:id', authenticateToken, canManageUsersMiddleware, async (req
     };
 
     if (role && !allowedRoles[req.user.role]?.includes(role)) {
-      return res.status(403).json({ error: `Cannot assign role: ${role}` });
+      return res.status(403).json({ error: 'Insufficient permissions for this role' });
     }
 
     await run(
@@ -204,11 +217,11 @@ router.put('/users/:id/reset-password', authenticateToken, async (req, res) => {
     if (!targetUser) return res.status(404).json({ error: 'User not found' });
 
     const { password } = req.body;
-    if (!password || password.length < 6) {
+    if (!password || typeof password !== 'string' || password.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
-    const hash = bcrypt.hashSync(password, 10);
+    const hash = await bcrypt.hash(password, 10);
     await run('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, req.params.id]);
 
     await run(

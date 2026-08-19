@@ -34,10 +34,30 @@ const authLimiter = rateLimit({
   message: { error: 'Too many login attempts, please try again later.' },
 });
 
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many registration attempts, please try again later.' },
+});
+
+app.use(cors({ origin: process.env.ALLOWED_ORIGINS?.split(',') || '*' }));
+app.use(express.json({ limit: '10mb' }));
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  next();
+});
+
 app.use('/api', limiter);
 app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', registerLimiter);
 
 app.use('/api/auth', authRoutes);
 app.use('/api/facilities', facilityRoutes);

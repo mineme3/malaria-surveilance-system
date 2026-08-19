@@ -26,7 +26,9 @@ async function createAlert(user, type, title, message) {
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const { page = 1, limit = 50, search, region, zone, woreda, kebele, date_from, date_to, sex, age_category, outcome, facility_id, epi_week, admission_type, haemoparasite_spp } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const safePage = Math.max(1, parseInt(page) || 1);
+    const safeLimit = Math.min(200, Math.max(1, parseInt(limit) || 50));
+    const offset = (safePage - 1) * safeLimit;
     const scope = buildDataScope(req.user);
 
     let where = 'WHERE 1=1';
@@ -68,12 +70,12 @@ router.get('/', authenticateToken, async (req, res) => {
        LEFT JOIN facilities f ON c.facility_id = f.id
        LEFT JOIN users u ON c.created_by = u.id
        ${where} ORDER BY c.created_at DESC LIMIT $${limitParam} OFFSET $${offsetParam}`,
-      [...params, parseInt(limit), offset]
+      [...params, safeLimit, offset]
     );
 
-    res.json({ cases, total, page: parseInt(page), limit: parseInt(limit) });
+    res.json({ cases, total, page: safePage, limit: safeLimit });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch cases', details: err.message });
+    res.status(500).json({ error: 'Failed to fetch cases',  });
   }
 });
 
@@ -132,7 +134,7 @@ router.get('/stats', authenticateToken, async (req, res) => {
       cases_this_year: thisYear,
       deaths,
       facilities_reporting: facilitiesReporting,
-      positive_rate: totalCases > 0 ? ((totalCases / Math.max(totalCases, 1)) * 100).toFixed(1) : 0,
+      positive_rate: totalCases > 0 ? ((parseInt((await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${baseWhere} AND c.haemoparasite_spp != ''`, baseParams)).count) / totalCases) * 100).toFixed(1) : 0,
       cases_by_week: casesByWeek,
       cases_by_region: casesByRegion,
       cases_by_woreda: casesByWoreda,
@@ -144,7 +146,7 @@ router.get('/stats', authenticateToken, async (req, res) => {
       recent_trend: recentTrend,
     });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch stats', details: err.message });
+    res.status(500).json({ error: 'Failed to fetch stats',  });
   }
 });
 
@@ -211,6 +213,36 @@ router.post('/', authenticateToken, async (req, res) => {
     const data = req.body;
     if (!data.patient_name || !data.sex || data.age === undefined) {
       return res.status(400).json({ error: 'Patient name, sex, and age are required' });
+    }
+
+    // Input validation
+    if (typeof data.patient_name !== 'string' || data.patient_name.length < 1 || data.patient_name.length > 200) {
+      return res.status(400).json({ error: 'Invalid patient name' });
+    }
+    if (!['M', 'F'].includes(data.sex)) {
+      return res.status(400).json({ error: 'Sex must be M or F' });
+    }
+    const age = parseInt(data.age);
+    if (isNaN(age) || age < 0 || age > 150) {
+      return res.status(400).json({ error: 'Invalid age' });
+    }
+    if (data.outcome && !['Alive', 'Death'].includes(data.outcome)) {
+      return res.status(400).json({ error: 'Invalid outcome value' });
+    }
+    if (data.admission_type && !['Out-Patient', 'In-Patient'].includes(data.admission_type)) {
+      return res.status(400).json({ error: 'Invalid admission type' });
+    }
+    if (data.epi_week) {
+      const ew = parseInt(data.epi_week);
+      if (isNaN(ew) || ew < 1 || ew > 53) {
+        return res.status(400).json({ error: 'Invalid epi week' });
+      }
+    }
+    const yesNoFields = ['fever', 'headache', 'joint_pain', 'chills_rigor', 'vomiting', 'back_pain', 'specimen_taken', 'ftat_done'];
+    for (const field of yesNoFields) {
+      if (data[field] && !['Yes', 'No'].includes(data[field])) {
+        return res.status(400).json({ error: `Invalid value for ${field}` });
+      }
     }
 
     const facilityId = data.facility_id || req.user.facility_id;
@@ -286,7 +318,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
     res.status(201).json({ message: 'Case created successfully', id: result.id });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to create case', details: err.message });
+    res.status(500).json({ error: 'Failed to create case',  });
   }
 });
 
@@ -328,7 +360,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
     res.json({ message: 'Case updated successfully' });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to update case', details: err.message });
+    res.status(500).json({ error: 'Failed to update case',  });
   }
 });
 
@@ -371,9 +403,16 @@ router.post('/sync', authenticateToken, async (req, res) => {
 
         // Check if a case with this client_side_id already exists
         if (clientId) {
-          const existing = await queryOne('SELECT id, updated_at FROM malaria_cases WHERE client_side_id = $1', [clientId]);
+          const existing = await queryOne('SELECT id, updated_at, facility_id, zone, woreda FROM malaria_cases WHERE client_side_id = $1', [clientId]);
 
           if (existing) {
+            // Check if user has permission to modify this case
+            const existingCase = await queryOne('SELECT * FROM malaria_cases WHERE id = $1', [existing.id]);
+            if (existingCase && !canModifyCase(req.user, existingCase)) {
+              results.push({ client_side_id: clientId, status: 'error', error: 'Access denied' });
+              continue;
+            }
+
             // Compare timestamps: server version wins if it's newer, otherwise client version wins
             const clientUpdated = new Date(c.updated_at || 0).getTime();
             const serverUpdated = new Date(existing.updated_at || 0).getTime();
@@ -505,7 +544,7 @@ router.post('/sync', authenticateToken, async (req, res) => {
 
         results.push({ client_side_id: clientId, status: 'created', server_id: result.id });
       } catch (e) {
-        results.push({ client_side_id: c.client_side_id, status: 'error', error: e.message });
+        results.push({ client_side_id: c.client_side_id, status: 'error', error: 'Sync failed for this case' });
       }
     }
 
@@ -514,7 +553,7 @@ router.post('/sync', authenticateToken, async (req, res) => {
       results,
     });
   } catch (err) {
-    res.status(500).json({ error: 'Sync failed', details: err.message });
+    res.status(500).json({ error: 'Sync failed',  });
   }
 });
 
@@ -616,7 +655,7 @@ router.post('/import', authenticateToken, async (req, res) => {
       errors: errors.length > 0 ? errors.slice(0, 20) : undefined,
     });
   } catch (err) {
-    res.status(500).json({ error: 'Import failed', details: err.message });
+    res.status(500).json({ error: 'Import failed',  });
   }
 });
 
@@ -710,7 +749,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
 
     res.json({ message: `Generated ${inserted} test cases`, count: inserted });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to generate data', details: err.message });
+    res.status(500).json({ error: 'Failed to generate data',  });
   }
 });
 

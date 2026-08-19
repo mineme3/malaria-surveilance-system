@@ -35,7 +35,7 @@ function shareChart(shareType: 'telegram' | 'whatsapp' | 'email' | 'copy', chart
       window.open(`mailto:?subject=${encodeURIComponent(chartTitle)}&body=${encoded}%0A%0AView%20more%20at%20${encodeURIComponent(url)}`, '_blank');
       break;
     case 'copy':
-      navigator.clipboard.writeText(`${chartTitle}\n\n${text}\n\nView more at ${url}`);
+      navigator.clipboard.writeText(`${text}\n\nView more at ${url}`);
       break;
   }
 }

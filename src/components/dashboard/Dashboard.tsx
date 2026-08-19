@@ -256,7 +256,7 @@ export default function Dashboard() {
                   label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                 >
                   {stats.cases_by_sex.map((_: any, i: number) => (
-                    <Cell key={i} fill={COLORS[i]} />
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>
                 <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }} />

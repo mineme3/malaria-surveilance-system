@@ -85,7 +85,7 @@ export default function SendAlert() {
 
           {result && (
             <div className={`p-3 rounded-lg text-sm ${result.error ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
-              {result.error || `Notification sent to ${result.sent} users`}
+              {result.error || `Notification sent successfully${result.sent ? ` to ${result.sent} users` : ''}`}
             </div>
           )}
 
