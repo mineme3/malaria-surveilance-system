@@ -73,6 +73,13 @@ class ApiService {
     });
   }
 
+  async createFacilityWithAccount(data: any) {
+    return this.request('/facilities/with-account', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async updateFacility(id: number, data: any) {
     return this.request(`/facilities/${id}`, {
       method: 'PUT',

@@ -30,13 +30,27 @@ export default function UserManagement() {
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [resetUser, setResetUser] = useState<any>(null);
-  const [formData, setFormData] = useState({ full_name: '', role: 'facility_user', facility_id: '', is_active: true });
+  const [formData, setFormData] = useState({ username: '', full_name: '', role: 'facility_user', facility_id: '', is_active: true });
   const [newUser, setNewUser] = useState({ username: '', email: '', password: '', full_name: '', role: 'facility_user', facility_id: '' });
   const [resetPassword, setResetPassword] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const isAdmin = user?.role === 'system_admin';
+  const isAdmin = ['system_admin', 'region_admin', 'zone_admin', 'district_admin'].includes(user?.role || '');
+
+  const ROLE_LEVELS: Record<string, number> = {
+    facility_user: 0,
+    facility_admin: 1,
+    district_admin: 2,
+    zone_admin: 3,
+    region_admin: 4,
+    system_admin: 5,
+  };
+
+  const getAllowedRoles = (userRole: string): { value: string; label: string }[] => {
+    const userLevel = ROLE_LEVELS[userRole] || 0;
+    return roles.filter((r) => ROLE_LEVELS[r.value] < userLevel);
+  };
 
   useEffect(() => { loadData(); }, []);
 
@@ -50,7 +64,7 @@ export default function UserManagement() {
 
   const handleEdit = (u: any) => {
     setEditingUser(u);
-    setFormData({ full_name: u.full_name, role: u.role, facility_id: u.facility_id?.toString() || '', is_active: !!u.is_active });
+    setFormData({ username: u.username, full_name: u.full_name, role: u.role, facility_id: u.facility_id?.toString() || '', is_active: !!u.is_active });
     setError('');
     setShowEditDialog(true);
   };
@@ -60,7 +74,13 @@ export default function UserManagement() {
     setSaving(true);
     setError('');
     try {
-      await api.updateUser(editingUser.id, { ...formData, facility_id: formData.facility_id ? parseInt(formData.facility_id) : null });
+      await api.updateUser(editingUser.id, {
+        username: formData.username,
+        full_name: formData.full_name,
+        role: formData.role,
+        facility_id: formData.facility_id ? parseInt(formData.facility_id) : null,
+        is_active: formData.is_active
+      });
       setShowEditDialog(false);
       loadData();
     } catch (e: any) { setError(e.message); } finally { setSaving(false); }
@@ -184,6 +204,10 @@ export default function UserManagement() {
           {error && <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{error}</div>}
           <div className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="edit-username">Username</Label>
+              <Input id="edit-username" value={formData.username} onChange={(e) => setFormData({ ...formData, username: e.target.value })} />
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="edit-name">Full Name</Label>
               <Input id="edit-name" value={formData.full_name} onChange={(e) => setFormData({ ...formData, full_name: e.target.value })} />
             </div>
@@ -194,7 +218,7 @@ export default function UserManagement() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {roles.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                  {getAllowedRoles(user?.role || '').map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -256,7 +280,7 @@ export default function UserManagement() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {roles.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
+                  {getAllowedRoles(user?.role || '').map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import bcrypt from 'bcryptjs';
 import { queryOne, queryAll, run, runReturning } from '../db.js';
 import { authenticateToken, buildFacilityScope, canManageFacilitiesMiddleware } from '../middleware/auth.js';
 
@@ -92,6 +93,85 @@ router.post('/', authenticateToken, canManageFacilitiesMiddleware, async (req, r
     res.status(201).json({ message: 'Facility created', id: result.id });
   } catch (err) {
     res.status(500).json({ error: 'Failed to create facility' });
+  }
+});
+
+router.post('/with-account', authenticateToken, canManageFacilitiesMiddleware, async (req, res) => {
+  try {
+    const { name, region, zone, woreda, kebele, facility_type, phone, username, email, password, full_name } = req.body;
+
+    if (!name || !region || !zone || !woreda) {
+      return res.status(400).json({ error: 'Facility name, region, zone, and woreda are required' });
+    }
+
+    if (!username || !email || !password || !full_name) {
+      return res.status(400).json({ error: 'Username, email, password, and full name are required for the facility account' });
+    }
+
+    if (typeof username !== 'string' || !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
+      return res.status(400).json({ error: 'Username must be 3-30 alphanumeric characters or underscores' });
+    }
+
+    if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ error: 'Invalid email format' });
+    }
+
+    if (typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+
+    if (req.user.role === 'district_admin') {
+      if (woreda !== req.user.woreda || zone !== req.user.zone || region !== req.user.region) {
+        return res.status(403).json({ error: 'Can only create facilities in your district' });
+      }
+    }
+    if (req.user.role === 'zone_admin') {
+      if (zone !== req.user.zone || region !== req.user.region) {
+        return res.status(403).json({ error: 'Can only create facilities in your zone' });
+      }
+    }
+    if (req.user.role === 'region_admin') {
+      if (region !== req.user.region) {
+        return res.status(403).json({ error: 'Can only create facilities in your region' });
+      }
+    }
+
+    const existingUsername = await queryOne('SELECT id FROM users WHERE username = $1', [username]);
+    if (existingUsername) {
+      return res.status(409).json({ error: 'Username already exists' });
+    }
+
+    const existingEmail = await queryOne('SELECT id FROM users WHERE email = $1', [email]);
+    if (existingEmail) {
+      return res.status(409).json({ error: 'Email already exists' });
+    }
+
+    const facilityResult = await runReturning(
+      `INSERT INTO facilities (name, region, zone, woreda, kebele, facility_type, phone)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+      [name, region, zone, woreda, kebele || '', facility_type || 'Health Center', phone || '']
+    );
+
+    const hash = await bcrypt.hash(password, 10);
+    const userResult = await runReturning(
+      `INSERT INTO users (username, email, password_hash, full_name, role, facility_id, region, zone, woreda)
+       VALUES ($1, $2, $3, $4, 'facility_user', $5, $6, $7, $8) RETURNING id`,
+      [username, email, hash, full_name, facilityResult.id, region, zone, woreda]
+    );
+
+    await run(
+      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
+       VALUES ($1, 'create', 'facility', $2, $3)`,
+      [req.user.id, facilityResult.id, `Created facility: ${name} with user account: ${username}`]
+    );
+
+    res.status(201).json({
+      message: 'Facility and user account created',
+      facilityId: facilityResult.id,
+      userId: userResult.id
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to create facility with account' });
   }
 });
 

@@ -38,7 +38,7 @@ function App() {
           <Route path="data-quality" element={<DataQuality />} />
           <Route path="generate-data" element={<ProtectedRoute roles={['system_admin']}><DataGeneration /></ProtectedRoute>} />
           <Route path="audit" element={<ProtectedRoute roles={['system_admin']}><AuditLog /></ProtectedRoute>} />
-          <Route path="users" element={<ProtectedRoute roles={['system_admin']}><UserManagement /></ProtectedRoute>} />
+          <Route path="users" element={<ProtectedRoute roles={['system_admin','region_admin','zone_admin','district_admin']}><UserManagement /></ProtectedRoute>} />
           <Route path="alerts" element={<ProtectedRoute roles={['system_admin','region_admin','zone_admin']}><SendAlert /></ProtectedRoute>} />
         </Route>
         <Route path="*" element={<Navigate to="/login" replace />} />

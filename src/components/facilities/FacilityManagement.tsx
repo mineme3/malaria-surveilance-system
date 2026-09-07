@@ -10,6 +10,7 @@ import { Card, CardContent } from '../ui/card';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../ui/table';
 
 const emptyFacility = { name: '', region: '', zone: '', woreda: '', kebele: '', facility_type: 'Health Center', phone: '' };
+const emptyAccount = { username: '', email: '', password: '', full_name: '' };
 
 export default function FacilityManagement() {
   const [facilities, setFacilities] = useState<any[]>([]);
@@ -17,6 +18,8 @@ export default function FacilityManagement() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState(emptyFacility);
+  const [createAccount, setCreateAccount] = useState(false);
+  const [accountData, setAccountData] = useState(emptyAccount);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => { loadFacilities(); }, []);
@@ -34,9 +37,13 @@ export default function FacilityManagement() {
     if (facility) {
       setEditingId(facility.id);
       setFormData({ name: facility.name, region: facility.region, zone: facility.zone, woreda: facility.woreda, kebele: facility.kebele, facility_type: facility.facility_type, phone: facility.phone });
+      setCreateAccount(false);
+      setAccountData(emptyAccount);
     } else {
       setEditingId(null);
       setFormData(emptyFacility);
+      setCreateAccount(false);
+      setAccountData(emptyAccount);
     }
     setShowModal(true);
   };
@@ -46,10 +53,14 @@ export default function FacilityManagement() {
     try {
       if (editingId) {
         await api.updateFacility(editingId, { ...formData, is_active: true });
+      } else if (createAccount && accountData.username && accountData.email && accountData.password && accountData.full_name) {
+        await api.createFacilityWithAccount({ ...formData, ...accountData });
       } else {
         await api.createFacility(formData);
       }
       setShowModal(false);
+      setCreateAccount(false);
+      setAccountData(emptyAccount);
       loadFacilities();
     } catch (e: any) { alert(e.message); } finally { setSaving(false); }
   };
@@ -165,11 +176,47 @@ export default function FacilityManagement() {
                     <option value="Health Post">Health Post</option>
                   </select>
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Phone</Label>
-                  <Input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+251..." />
-                </div>
+              <div className="space-y-1.5">
+                <Label>Phone</Label>
+                <Input type="tel" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+251..." />
               </div>
+            </div>
+            {!editingId && (
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <input
+                    type="checkbox"
+                    id="create-account"
+                    checked={createAccount}
+                    onChange={(e) => setCreateAccount(e.target.checked)}
+                    className="rounded border-gray-300"
+                  />
+                  <Label htmlFor="create-account" className="font-medium">Create facility login account</Label>
+                </div>
+                {createAccount && (
+                  <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
+                    <div className="space-y-1.5">
+                      <Label>Account Full Name <span className="text-red-500">*</span></Label>
+                      <Input type="text" value={accountData.full_name} onChange={(e) => setAccountData({ ...accountData, full_name: e.target.value })} placeholder="e.g. John Doe" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label>Username <span className="text-red-500">*</span></Label>
+                        <Input type="text" value={accountData.username} onChange={(e) => setAccountData({ ...accountData, username: e.target.value })} placeholder="e.g. facility1" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Email <span className="text-red-500">*</span></Label>
+                        <Input type="email" value={accountData.email} onChange={(e) => setAccountData({ ...accountData, email: e.target.value })} placeholder="e.g. facility@example.com" />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Password <span className="text-red-500">*</span></Label>
+                      <Input type="password" value={accountData.password} onChange={(e) => setAccountData({ ...accountData, password: e.target.value })} placeholder="Min 6 characters" />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             </div>
             <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
               <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>

@@ -16,7 +16,7 @@ const navItems = [
   { to: '/reports', icon: BarChart3, label: 'Reports', minRole: 'facility_user' },
   { to: '/data-quality', icon: Activity, label: 'Data Quality', minRole: 'facility_user' },
   { to: '/audit', icon: Shield, label: 'Audit Log', minRole: 'system_admin' },
-  { to: '/users', icon: User, label: 'User Management', minRole: 'system_admin' },
+  { to: '/users', icon: User, label: 'User Management', minRole: 'district_admin' },
   { to: '/alerts', icon: Send, label: 'Send Alert', minRole: 'zone_admin' },
   { to: '/generate-data', icon: Database, label: 'Generate Data', minRole: 'system_admin' },
 ];

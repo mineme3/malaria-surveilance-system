@@ -177,7 +177,19 @@ router.put('/users/:id', authenticateToken, canManageUsersMiddleware, async (req
       }
     }
 
-    const { full_name, role, is_active, facility_id } = req.body;
+    const { username, full_name, role, is_active, facility_id } = req.body;
+
+    if (username !== undefined) {
+      if (typeof username !== 'string' || !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
+        return res.status(400).json({ error: 'Username must be 3-30 alphanumeric characters or underscores' });
+      }
+      if (username !== targetUser.username) {
+        const existingUsername = await queryOne('SELECT id FROM users WHERE username = $1 AND id != $2', [username, req.params.id]);
+        if (existingUsername) {
+          return res.status(409).json({ error: 'Username already exists' });
+        }
+      }
+    }
 
     const allowedRoles = {
       system_admin: ['system_admin', 'region_admin', 'zone_admin', 'district_admin', 'facility_admin', 'facility_user'],
@@ -191,14 +203,18 @@ router.put('/users/:id', authenticateToken, canManageUsersMiddleware, async (req
     }
 
     await run(
-      'UPDATE users SET full_name = $1, role = $2, is_active = $3, facility_id = $4 WHERE id = $5',
-      [full_name || targetUser.full_name, role || targetUser.role, is_active !== undefined ? (is_active ? 1 : 0) : targetUser.is_active, facility_id || targetUser.facility_id, req.params.id]
+      'UPDATE users SET username = $1, full_name = $2, role = $3, is_active = $4, facility_id = $5 WHERE id = $6',
+      [username || targetUser.username, full_name || targetUser.full_name, role || targetUser.role, is_active !== undefined ? (is_active ? 1 : 0) : targetUser.is_active, facility_id || targetUser.facility_id, req.params.id]
     );
+
+    const details = username && username !== targetUser.username
+      ? `Updated user: ${targetUser.username} -> ${username}`
+      : `Updated user: ${targetUser.username}`;
 
     await run(
       `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
        VALUES ($1, 'update', 'user', $2, $3)`,
-      [req.user.id, req.params.id, `Updated user: ${targetUser.username}`]
+      [req.user.id, req.params.id, details]
     );
 
     res.json({ message: 'User updated' });
@@ -207,14 +223,22 @@ router.put('/users/:id', authenticateToken, canManageUsersMiddleware, async (req
   }
 });
 
-router.put('/users/:id/reset-password', authenticateToken, async (req, res) => {
+router.put('/users/:id/reset-password', authenticateToken, canManageUsersMiddleware, async (req, res) => {
   try {
-    if (req.user.role !== 'system_admin') {
-      return res.status(403).json({ error: 'Only system administrators can reset passwords' });
-    }
-
     const targetUser = await queryOne('SELECT * FROM users WHERE id = $1', [req.params.id]);
     if (!targetUser) return res.status(404).json({ error: 'User not found' });
+
+    if (req.user.role !== 'system_admin') {
+      if (req.user.role === 'region_admin' && targetUser.region !== req.user.region) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      if (req.user.role === 'zone_admin' && targetUser.zone !== req.user.zone) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      if (req.user.role === 'district_admin' && targetUser.woreda !== req.user.woreda) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+    }
 
     const { password } = req.body;
     if (!password || typeof password !== 'string' || password.length < 6) {
