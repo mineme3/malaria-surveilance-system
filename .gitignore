@@ -8,3 +8,6 @@ dist
 *.db-shm
 .DS_Store
 server/seed-db.js
+node_modules/
+.env
+server/*.db
