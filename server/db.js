@@ -7,9 +7,9 @@ let pool = null;
 let sqliteDb = null;
 
 if (DATABASE_URL) {
-  // PostgreSQL mode
   const { Pool } = await import('pg');
-  pool = new Pool({ connectionString: DATABASE_URL });
+  const cleanUrl = DATABASE_URL.replace(/sslmode=[^&]+/, 'sslmode=require');
+  pool = new Pool({ connectionString: cleanUrl });
   console.log('Connected to PostgreSQL database');
 } else {
   // SQLite mode (local development)

@@ -130,4 +130,15 @@ export async function initDatabase() {
   await run(`${idx} idx_notifications_user ON notifications(user_id)`);
 
   console.log(`Database tables and indexes created successfully (${isPostgres ? 'PostgreSQL' : 'SQLite'})`);
+
+  if (isPostgres) {
+    const migrations = [
+      `ALTER TABLE users ALTER COLUMN is_active TYPE BOOLEAN USING is_active::BOOLEAN`,
+      `ALTER TABLE facilities ALTER COLUMN is_active TYPE BOOLEAN USING is_active::BOOLEAN`,
+      `ALTER TABLE notifications ALTER COLUMN is_read TYPE BOOLEAN USING is_read::BOOLEAN`,
+    ];
+    for (const sql of migrations) {
+      try { await run(sql); } catch (e) { /* column already correct type */ }
+    }
+  }
 }
