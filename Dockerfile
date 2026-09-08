@@ -1,8 +1,8 @@
-# Stage 1: Build frontend
+# Stage 1: Build frontend (skip native module compilation — not needed for frontend)
 FROM node:20-alpine AS frontend-build
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 COPY . .
 RUN npm run build
 
@@ -11,7 +11,7 @@ FROM node:20-alpine
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
 
 COPY server ./server
 COPY --from=frontend-build /app/dist ./dist
