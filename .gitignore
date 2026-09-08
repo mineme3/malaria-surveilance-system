@@ -1,5 +1,5 @@
-node_modules
-dist
+node_modules/
+dist/
 .env
 .env.local
 *.db
@@ -8,6 +8,3 @@ dist
 *.db-shm
 .DS_Store
 server/seed-db.js
-node_modules/
-.env
-server/*.db
