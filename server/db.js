@@ -29,13 +29,8 @@ function convertPlaceholders(text) {
 
 async function run(text, params = []) {
   if (pool) {
-    const client = await pool.connect();
-    try {
-      await client.query(text, params);
-      return { rowCount: 0, rows: [] };
-    } finally {
-      client.release();
-    }
+    await pool.query(text, params);
+    return { rowCount: 0, rows: [] };
   } else {
     const converted = convertPlaceholders(text);
     const stmt = sqliteDb.prepare(converted);
@@ -46,13 +41,9 @@ async function run(text, params = []) {
 
 async function runReturning(text, params = []) {
   if (pool) {
-    const client = await pool.connect();
-    try {
-      const result = await client.query(text + ' RETURNING id', params);
-      return result.rows[0] || null;
-    } finally {
-      client.release();
-    }
+    const sql = /RETURNING/i.test(text) ? text : text + ' RETURNING id';
+    const result = await pool.query(sql, params);
+    return result.rows[0] || null;
   } else {
     const converted = convertPlaceholders(text);
     const stmt = sqliteDb.prepare(converted);
@@ -66,13 +57,8 @@ async function runReturning(text, params = []) {
 
 async function query(text, params = []) {
   if (pool) {
-    const client = await pool.connect();
-    try {
-      const result = await client.query(text, params);
-      return result.rows;
-    } finally {
-      client.release();
-    }
+    const result = await pool.query(text, params);
+    return result.rows;
   } else {
     const converted = convertPlaceholders(text);
     const stmt = sqliteDb.prepare(converted);
@@ -82,13 +68,8 @@ async function query(text, params = []) {
 
 async function queryOne(text, params = []) {
   if (pool) {
-    const client = await pool.connect();
-    try {
-      const result = await client.query(text, params);
-      return result.rows[0] || null;
-    } finally {
-      client.release();
-    }
+    const result = await pool.query(text, params);
+    return result.rows[0] || null;
   } else {
     const converted = convertPlaceholders(text);
     const stmt = sqliteDb.prepare(converted);
