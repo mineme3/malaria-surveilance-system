@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, KeyRound } from 'lucide-react';
+import { Plus, Edit, KeyRound, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
 import { api } from '../../services/api';
 import { useAuth } from '../../hooks/useAuth';
 import { Button } from '../ui/button';
@@ -50,6 +50,13 @@ export default function UserManagement() {
   const getAllowedRoles = (userRole: string): { value: string; label: string }[] => {
     const userLevel = ROLE_LEVELS[userRole] || 0;
     return roles.filter((r) => ROLE_LEVELS[r.value] < userLevel);
+  };
+
+  const canManageUser = (targetUser: any): boolean => {
+    if (user?.role === 'system_admin') return true;
+    const myLevel = ROLE_LEVELS[user?.role || 'facility_user'] || 0;
+    const targetLevel = ROLE_LEVELS[targetUser.role] || 0;
+    return targetLevel < myLevel;
   };
 
   useEffect(() => { loadData(); }, []);
@@ -116,6 +123,21 @@ export default function UserManagement() {
     setShowResetDialog(true);
   };
 
+  const handleToggleActive = async (u: any) => {
+    try {
+      await api.toggleUserActive(u.id);
+      loadData();
+    } catch (e: any) { alert(e.message); }
+  };
+
+  const handleDelete = async (u: any) => {
+    if (!confirm(`Deactivate ${u.full_name}? They will no longer be able to log in.`)) return;
+    try {
+      await api.deleteUser(u.id);
+      loadData();
+    } catch (e: any) { alert(e.message); }
+  };
+
   const getRoleBadgeVariant = (role: string): "default" | "secondary" | "destructive" | "outline" | "success" | "warning" => {
     switch (role) {
       case 'system_admin': return 'destructive';
@@ -177,11 +199,21 @@ export default function UserManagement() {
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => handleEdit(u)}>
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      {isAdmin && (
-                        <Button variant="ghost" size="icon" onClick={() => openResetDialog(u)}>
+                      {canManageUser(u) && (
+                        <>
+                          <Button variant="ghost" size="icon" onClick={() => handleEdit(u)} title="Edit">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleToggleActive(u)} title={u.is_active ? 'Deactivate' : 'Activate'}>
+                            {u.is_active ? <ToggleRight className="h-4 w-4 text-green-600" /> : <ToggleLeft className="h-4 w-4 text-gray-400" />}
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(u)} title="Deactivate user">
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </>
+                      )}
+                      {isAdmin && canManageUser(u) && (
+                        <Button variant="ghost" size="icon" onClick={() => openResetDialog(u)} title="Reset password">
                           <KeyRound className="h-4 w-4" />
                         </Button>
                       )}

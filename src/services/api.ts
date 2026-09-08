@@ -58,6 +58,14 @@ class ApiService {
     });
   }
 
+  async toggleUserActive(id: number) {
+    return this.request(`/auth/users/${id}/toggle-active`, { method: 'PUT' });
+  }
+
+  async deleteUser(id: number) {
+    return this.request(`/auth/users/${id}`, { method: 'DELETE' });
+  }
+
   async getFacilities() {
     return this.request('/facilities');
   }

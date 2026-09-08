@@ -23,7 +23,12 @@ router.get('/', authenticateToken, async (req, res) => {
 
 router.get('/all', authenticateToken, async (req, res) => {
   try {
-    const facilities = await queryAll('SELECT id, name, region, zone, woreda FROM facilities WHERE is_active = 1 ORDER BY name');
+    const scope = buildFacilityScope(req.user);
+    const scopeWhere = scope.where ? scope.where.replace(/^ WHERE/, ' AND') : '';
+    const facilities = await queryAll(
+      `SELECT id, name, region, zone, woreda FROM facilities WHERE is_active = 1${scopeWhere} ORDER BY name`,
+      scope.params
+    );
     res.json(facilities);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch facilities' });

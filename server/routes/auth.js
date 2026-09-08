@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { queryOne, queryAll, run, runReturning } from '../db.js';
-import { JWT_SECRET, authenticateToken, canManageUsers, canManageUsersMiddleware, buildFacilityScope } from '../middleware/auth.js';
+import { JWT_SECRET, authenticateToken, canManageUsers, canManageUsersMiddleware, ROLE_HIERARCHY } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -134,18 +134,19 @@ router.get('/me', authenticateToken, async (req, res) => {
 
 router.get('/users', authenticateToken, canManageUsersMiddleware, async (req, res) => {
   try {
-    let where = '';
+    const myLevel = ROLE_HIERARCHY[req.user.role] || 0;
+    let where = ` WHERE role IN (${Object.entries(ROLE_HIERARCHY).filter(([_, level]) => level < myLevel).map(([role]) => `'${role}'`).join(',')})`;
     const params = [];
     let paramIndex = 1;
 
     if (req.user.role === 'region_admin') {
-      where = ` WHERE region = $${paramIndex++}`;
+      where += ` AND region = $${paramIndex++}`;
       params.push(req.user.region);
     } else if (req.user.role === 'zone_admin') {
-      where = ` WHERE zone = $${paramIndex++} AND region = $${paramIndex++}`;
+      where += ` AND zone = $${paramIndex++} AND region = $${paramIndex++}`;
       params.push(req.user.zone, req.user.region);
     } else if (req.user.role === 'district_admin') {
-      where = ` WHERE woreda = $${paramIndex++} AND zone = $${paramIndex++} AND region = $${paramIndex++}`;
+      where += ` AND woreda = $${paramIndex++} AND zone = $${paramIndex++} AND region = $${paramIndex++}`;
       params.push(req.user.woreda, req.user.zone, req.user.region);
     }
 
@@ -166,6 +167,12 @@ router.put('/users/:id', authenticateToken, canManageUsersMiddleware, async (req
     if (!targetUser) return res.status(404).json({ error: 'User not found' });
 
     if (req.user.role !== 'system_admin') {
+      const myLevel = ROLE_HIERARCHY[req.user.role] || 0;
+      const targetLevel = ROLE_HIERARCHY[targetUser.role] || 0;
+      if (targetLevel >= myLevel) {
+        return res.status(403).json({ error: 'Cannot edit users at or above your role level' });
+      }
+
       if (req.user.role === 'region_admin' && targetUser.region !== req.user.region) {
         return res.status(403).json({ error: 'Access denied' });
       }
@@ -223,12 +230,99 @@ router.put('/users/:id', authenticateToken, canManageUsersMiddleware, async (req
   }
 });
 
+router.put('/users/:id/toggle-active', authenticateToken, canManageUsersMiddleware, async (req, res) => {
+  try {
+    const targetUser = await queryOne('SELECT * FROM users WHERE id = $1', [req.params.id]);
+    if (!targetUser) return res.status(404).json({ error: 'User not found' });
+
+    if (req.user.role !== 'system_admin') {
+      const myLevel = ROLE_HIERARCHY[req.user.role] || 0;
+      const targetLevel = ROLE_HIERARCHY[targetUser.role] || 0;
+      if (targetLevel >= myLevel) {
+        return res.status(403).json({ error: 'Cannot modify users at or above your role level' });
+      }
+      if (req.user.role === 'region_admin' && targetUser.region !== req.user.region) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      if (req.user.role === 'zone_admin' && targetUser.zone !== req.user.zone) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      if (req.user.role === 'district_admin' && targetUser.woreda !== req.user.woreda) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+    }
+
+    if (targetUser.id === req.user.id) {
+      return res.status(400).json({ error: 'Cannot deactivate your own account' });
+    }
+
+    const newStatus = targetUser.is_active ? 0 : 1;
+    await run('UPDATE users SET is_active = $1 WHERE id = $2', [newStatus, req.params.id]);
+
+    await run(
+      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
+       VALUES ($1, 'update', 'user', $2, $3)`,
+      [req.user.id, req.params.id, `${newStatus ? 'Activated' : 'Deactivated'} user: ${targetUser.username}`]
+    );
+
+    res.json({ message: `User ${newStatus ? 'activated' : 'deactivated'}`, is_active: newStatus });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to toggle user status' });
+  }
+});
+
+router.delete('/users/:id', authenticateToken, canManageUsersMiddleware, async (req, res) => {
+  try {
+    const targetUser = await queryOne('SELECT * FROM users WHERE id = $1', [req.params.id]);
+    if (!targetUser) return res.status(404).json({ error: 'User not found' });
+
+    if (req.user.role !== 'system_admin') {
+      const myLevel = ROLE_HIERARCHY[req.user.role] || 0;
+      const targetLevel = ROLE_HIERARCHY[targetUser.role] || 0;
+      if (targetLevel >= myLevel) {
+        return res.status(403).json({ error: 'Cannot delete users at or above your role level' });
+      }
+      if (req.user.role === 'region_admin' && targetUser.region !== req.user.region) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      if (req.user.role === 'zone_admin' && targetUser.zone !== req.user.zone) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      if (req.user.role === 'district_admin' && targetUser.woreda !== req.user.woreda) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+    }
+
+    if (targetUser.id === req.user.id) {
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    }
+
+    await run('UPDATE users SET is_active = 0 WHERE id = $1', [req.params.id]);
+
+    await run(
+      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
+       VALUES ($1, 'delete', 'user', $2, $3)`,
+      [req.user.id, req.params.id, `Deactivated user: ${targetUser.username} (${targetUser.role})`]
+    );
+
+    res.json({ message: 'User deactivated' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to deactivate user' });
+  }
+});
+
 router.put('/users/:id/reset-password', authenticateToken, canManageUsersMiddleware, async (req, res) => {
   try {
     const targetUser = await queryOne('SELECT * FROM users WHERE id = $1', [req.params.id]);
     if (!targetUser) return res.status(404).json({ error: 'User not found' });
 
     if (req.user.role !== 'system_admin') {
+      const myLevel = ROLE_HIERARCHY[req.user.role] || 0;
+      const targetLevel = ROLE_HIERARCHY[targetUser.role] || 0;
+      if (targetLevel >= myLevel) {
+        return res.status(403).json({ error: 'Cannot reset password for users at or above your role level' });
+      }
+
       if (req.user.role === 'region_admin' && targetUser.region !== req.user.region) {
         return res.status(403).json({ error: 'Access denied' });
       }
