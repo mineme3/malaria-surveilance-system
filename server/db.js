@@ -83,3 +83,29 @@ async function queryAll(text, params = []) {
 
 export { query, queryOne, queryAll, run, runReturning };
 export default pool || sqliteDb;
+
+const isPostgres = !!pool;
+
+export const sql = {
+  dateTruncMonth(col) {
+    return isPostgres ? `to_char(${col}::date, 'YYYY-MM')` : `strftime('%Y-%m', ${col})`;
+  },
+  dateTruncYear(col) {
+    return isPostgres ? `to_char(${col}::date, 'YYYY')` : `strftime('%Y', ${col})`;
+  },
+  dateTruncWeek(col) {
+    return isPostgres ? `to_char(${col}::date, 'IYYY-IW')` : `strftime('%Y-%W', ${col})`;
+  },
+  now() {
+    return isPostgres ? `to_char(NOW(), 'YYYY-MM-DD')` : `date('now')`;
+  },
+  nowMonth() {
+    return isPostgres ? `to_char(NOW(), 'YYYY-MM')` : `strftime('%Y-%m', 'now')`;
+  },
+  nowYear() {
+    return isPostgres ? `to_char(NOW(), 'YYYY')` : `strftime('%Y', 'now')`;
+  },
+  nowWeek() {
+    return isPostgres ? `to_char(NOW(), 'IYYY-IW')` : `strftime('%Y-%W', 'now')`;
+  },
+};

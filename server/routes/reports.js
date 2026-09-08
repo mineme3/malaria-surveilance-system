@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { queryOne, queryAll, run } from '../db.js';
+import { queryOne, queryAll, run, sql } from '../db.js';
 import { authenticateToken, buildDataScope, requireMinRole } from '../middleware/auth.js';
 
 const router = Router();
@@ -95,11 +95,11 @@ router.get('/generate', authenticateToken, async (req, res) => {
     // Trend data for weekly/monthly/yearly
     let trendData = [];
     if (type === 'weekly') {
-      trendData = await queryAll(`SELECT strftime('%Y-%W', c.date_seen) as period, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
+      trendData = await queryAll(`SELECT ${sql.dateTruncWeek('c.date_seen')} as period, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
     } else if (type === 'monthly') {
-      trendData = await queryAll(`SELECT strftime('%Y-%m', c.date_seen) as period, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
+      trendData = await queryAll(`SELECT ${sql.dateTruncMonth('c.date_seen')} as period, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
     } else if (type === 'annual') {
-      trendData = await queryAll(`SELECT strftime('%Y', c.date_seen) as period, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
+      trendData = await queryAll(`SELECT ${sql.dateTruncYear('c.date_seen')} as period, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
     }
 
     const report = {
