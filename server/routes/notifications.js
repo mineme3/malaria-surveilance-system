@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { queryOne, queryAll, run, isActive } from '../db.js';
+import { queryOne, queryAll, run, boolCol, boolParam } from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
@@ -12,7 +12,7 @@ router.get('/', authenticateToken, async (req, res) => {
     let paramIndex = 2;
 
     if (type) { where += ` AND type = $${paramIndex++}`; params.push(type); }
-    if (unread_only === 'true') { where += ' AND is_read = 0'; }
+    if (unread_only === 'true') { where += ` AND ${boolCol('is_read', false)}`; }
 
     const notifications = await queryAll(
       `SELECT * FROM notifications ${where} ORDER BY created_at DESC LIMIT 50`,
@@ -26,7 +26,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
 router.get('/unread-count', authenticateToken, async (req, res) => {
   try {
-    const result = await queryOne('SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND is_read = 0', [req.user.id]);
+    const result = await queryOne(`SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND ${boolCol('is_read', false)}`, [req.user.id]);
     res.json({ count: parseInt(result.count) });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch count' });
@@ -35,7 +35,7 @@ router.get('/unread-count', authenticateToken, async (req, res) => {
 
 router.put('/:id/read', authenticateToken, async (req, res) => {
   try {
-    await run('UPDATE notifications SET is_read = 1 WHERE id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    await run('UPDATE notifications SET is_read = $1 WHERE id = $2 AND user_id = $3', [boolParam(true), req.params.id, req.user.id]);
     res.json({ message: 'Notification marked as read' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update notification' });
@@ -44,7 +44,7 @@ router.put('/:id/read', authenticateToken, async (req, res) => {
 
 router.put('/read-all', authenticateToken, async (req, res) => {
   try {
-    await run('UPDATE notifications SET is_read = 1 WHERE user_id = $1', [req.user.id]);
+    await run('UPDATE notifications SET is_read = $1 WHERE user_id = $2', [boolParam(true), req.user.id]);
     res.json({ message: 'All notifications marked as read' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update notifications' });

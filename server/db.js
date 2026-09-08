@@ -93,7 +93,7 @@ const isPostgres = !!pool;
 
 export const BOOL_TRUE = isPostgres ? 'true' : '1';
 export const BOOL_FALSE = isPostgres ? 'false' : '0';
-export function boolParam(val) { return val ? (isPostgres ? true : 1) : (isPostgres ? false : 0); }
+export function boolParam(val) { return val ? 1 : 0; }
 
 export function isActive(col = 'is_active') {
   if (!isPostgres) return `${col} = 1`;
@@ -103,16 +103,22 @@ export function isNotActive(col = 'is_active') {
   if (!isPostgres) return `${col} = 0`;
   return `(${col}::text IN ('0','false','f','no'))`;
 }
+export function boolCol(col, val) {
+  if (!isPostgres) return `${col} = ${val ? 1 : 0}`;
+  const trues = "'1','true','t','yes'";
+  const falses = "'0','false','f','no'";
+  return `(${col}::text IN (${val ? trues : falses}))`;
+}
 
 export const sql = {
   dateTruncMonth(col) {
-    return isPostgres ? `to_char(${col}::date, 'YYYY-MM')` : `strftime('%Y-%m', ${col})`;
+    return isPostgres ? `to_char(NULLIF(${col}, '')::date, 'YYYY-MM')` : `strftime('%Y-%m', ${col})`;
   },
   dateTruncYear(col) {
-    return isPostgres ? `to_char(${col}::date, 'YYYY')` : `strftime('%Y', ${col})`;
+    return isPostgres ? `to_char(NULLIF(${col}, '')::date, 'YYYY')` : `strftime('%Y', ${col})`;
   },
   dateTruncWeek(col) {
-    return isPostgres ? `to_char(${col}::date, 'IYYY-IW')` : `strftime('%Y-%W', ${col})`;
+    return isPostgres ? `to_char(NULLIF(${col}, '')::date, 'IYYY-IW')` : `strftime('%Y-%W', ${col})`;
   },
   now() {
     return isPostgres ? `to_char(NOW(), 'YYYY-MM-DD')` : `date('now')`;
