@@ -47,8 +47,9 @@ router.get('/:id', authenticateToken, async (req, res) => {
 
     const scope = buildFacilityScope(req.user);
     if (scope.where) {
+      const scopeWhere = scope.where.replace(/^ WHERE/, ' AND');
       const checkParams = [req.params.id, ...scope.params];
-      const check = await queryOne(`SELECT 1 FROM facilities f WHERE f.id = $1 ${scope.where}`, checkParams);
+      const check = await queryOne(`SELECT 1 FROM facilities f WHERE f.id = $1${scopeWhere}`, checkParams);
       if (!check) {
         return res.status(403).json({ error: 'Access denied to this facility' });
       }

@@ -1,5 +1,5 @@
-const CACHE_NAME = 'malaria-pwa-v3';
-const API_CACHE = 'malaria-api-v2';
+const CACHE_NAME = 'malaria-pwa-v4';
+const API_CACHE = 'malaria-api-v3';
 
 const STATIC_ASSETS = [
   '/',
@@ -30,6 +30,24 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Short hash of the auth token so each logged-in user gets their own API cache.
+// API responses contain role-scoped data (region/zone/district), so they must
+// never be served from a cache written by a different user.
+function tokenCacheKey(token) {
+  let h = 0;
+  for (let i = 0; i < token.length; i++) {
+    h = (h * 31 + token.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h).toString(36);
+}
+
+function offlineApiResponse() {
+  return new Response(JSON.stringify({ error: 'Offline' }), {
+    status: 503,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
@@ -38,18 +56,28 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   if (url.pathname.startsWith('/@') || url.pathname.includes('vite') || url.search.includes('t=')) return;
 
-  // API requests: network-first with cache fallback
+  // API requests: network-first with a per-user cache fallback.
+  // The cache key includes a hash of the caller's token, so one region's data is
+  // never served to a different region/zone/district user when the network fails.
   if (url.pathname.startsWith('/api/')) {
+    const token = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+    if (!token) {
+      // Unauthenticated requests are never cached or served from cache.
+      event.respondWith(fetch(request).catch(() => offlineApiResponse()));
+      return;
+    }
+    const cacheUrl = new URL(request.url);
+    cacheUrl.searchParams.set('_uid', tokenCacheKey(token));
     event.respondWith(
       fetch(request)
         .then((response) => {
           if (response.ok) {
             const clone = response.clone();
-            caches.open(API_CACHE).then((cache) => cache.put(request, clone));
+            caches.open(API_CACHE).then((cache) => cache.put(cacheUrl, clone));
           }
           return response;
         })
-        .catch(() => caches.match(request))
+        .catch(async () => (await caches.match(cacheUrl)) || offlineApiResponse())
     );
     return;
   }

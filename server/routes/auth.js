@@ -52,6 +52,26 @@ router.post('/register', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: 'Insufficient permissions for this role' });
     }
 
+    // Geographic scope is mandatory for admin roles so a newly registered
+    // region/zone/district admin only ever sees their own area's data.
+    if (targetRole === 'region_admin' && !region) {
+      return res.status(400).json({ error: 'Region is required when registering a region admin' });
+    }
+    if (targetRole === 'zone_admin' && !zone) {
+      return res.status(400).json({ error: 'Zone is required when registering a zone admin' });
+    }
+    if (targetRole === 'district_admin' && !woreda) {
+      return res.status(400).json({ error: 'Woreda is required when registering a district admin' });
+    }
+    if (req.user.role === 'system_admin') {
+      if (targetRole === 'zone_admin' && !region) {
+        return res.status(400).json({ error: 'Region is required when registering a zone admin' });
+      }
+      if (targetRole === 'district_admin' && (!region || !zone)) {
+        return res.status(400).json({ error: 'Region and zone are required when registering a district admin' });
+      }
+    }
+
     let userRegion = region || req.user.region;
     let userZone = zone || req.user.zone;
     let userWoreda = woreda || req.user.woreda;
@@ -184,7 +204,7 @@ router.put('/users/:id', authenticateToken, canManageUsersMiddleware, async (req
       }
     }
 
-    const { username, full_name, role, is_active, facility_id } = req.body;
+    const { username, full_name, role, is_active, facility_id, region, zone, woreda } = req.body;
 
     if (username !== undefined) {
       if (typeof username !== 'string' || !/^[a-zA-Z0-9_]{3,30}$/.test(username)) {
@@ -209,9 +229,36 @@ router.put('/users/:id', authenticateToken, canManageUsersMiddleware, async (req
       return res.status(403).json({ error: 'Insufficient permissions for this role' });
     }
 
+    // Geographic scope is inherited from the editor or kept from the target user.
+    // A promoted admin without a scope would see nothing, so require it.
+    const newRole = role || targetUser.role;
+    let newRegion = region || targetUser.region;
+    let newZone = zone || targetUser.zone;
+    let newWoreda = woreda || targetUser.woreda;
+    if (req.user.role === 'district_admin') {
+      newRegion = req.user.region;
+      newZone = req.user.zone;
+      newWoreda = req.user.woreda;
+    } else if (req.user.role === 'zone_admin') {
+      newRegion = req.user.region;
+      newZone = req.user.zone;
+    } else if (req.user.role === 'region_admin') {
+      newRegion = req.user.region;
+    }
+
+    if (newRole === 'region_admin' && !newRegion) {
+      return res.status(400).json({ error: 'Region is required for a region admin' });
+    }
+    if (newRole === 'zone_admin' && !newZone) {
+      return res.status(400).json({ error: 'Zone is required for a zone admin' });
+    }
+    if (newRole === 'district_admin' && !newWoreda) {
+      return res.status(400).json({ error: 'Woreda is required for a district admin' });
+    }
+
     await run(
-      'UPDATE users SET username = $1, full_name = $2, role = $3, is_active = $4, facility_id = $5 WHERE id = $6',
-      [username || targetUser.username, full_name || targetUser.full_name, role || targetUser.role, is_active !== undefined ? boolParam(is_active) : targetUser.is_active, facility_id || targetUser.facility_id, req.params.id]
+      'UPDATE users SET username = $1, full_name = $2, role = $3, is_active = $4, facility_id = $5, region = $6, zone = $7, woreda = $8 WHERE id = $9',
+      [username || targetUser.username, full_name || targetUser.full_name, newRole, is_active !== undefined ? boolParam(is_active) : targetUser.is_active, facility_id || targetUser.facility_id, newRegion || '', newZone || '', newWoreda || '', req.params.id]
     );
 
     const details = username && username !== targetUser.username

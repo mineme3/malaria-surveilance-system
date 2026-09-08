@@ -30,8 +30,8 @@ export default function UserManagement() {
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [resetUser, setResetUser] = useState<any>(null);
-  const [formData, setFormData] = useState({ username: '', full_name: '', role: 'facility_user', facility_id: '', is_active: true });
-  const [newUser, setNewUser] = useState({ username: '', email: '', password: '', full_name: '', role: 'facility_user', facility_id: '' });
+  const [formData, setFormData] = useState({ username: '', full_name: '', role: 'facility_user', facility_id: '', is_active: true, region: '', zone: '', woreda: '' });
+  const [newUser, setNewUser] = useState({ username: '', email: '', password: '', full_name: '', role: 'facility_user', facility_id: '', region: '', zone: '', woreda: '' });
   const [resetPassword, setResetPassword] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -71,7 +71,7 @@ export default function UserManagement() {
 
   const handleEdit = (u: any) => {
     setEditingUser(u);
-    setFormData({ username: u.username, full_name: u.full_name, role: u.role, facility_id: u.facility_id?.toString() || '', is_active: !!u.is_active });
+    setFormData({ username: u.username, full_name: u.full_name, role: u.role, facility_id: u.facility_id?.toString() || '', is_active: !!u.is_active, region: u.region || '', zone: u.zone || '', woreda: u.woreda || '' });
     setError('');
     setShowEditDialog(true);
   };
@@ -86,7 +86,10 @@ export default function UserManagement() {
         full_name: formData.full_name,
         role: formData.role,
         facility_id: formData.facility_id ? parseInt(formData.facility_id) : null,
-        is_active: formData.is_active
+        is_active: formData.is_active,
+        region: formData.region,
+        zone: formData.zone,
+        woreda: formData.woreda,
       });
       setShowEditDialog(false);
       loadData();
@@ -99,7 +102,7 @@ export default function UserManagement() {
     try {
       await api.register({ ...newUser, facility_id: newUser.facility_id ? parseInt(newUser.facility_id) : null });
       setShowCreateDialog(false);
-      setNewUser({ username: '', email: '', password: '', full_name: '', role: 'facility_user', facility_id: '' });
+      setNewUser({ username: '', email: '', password: '', full_name: '', role: 'facility_user', facility_id: '', region: '', zone: '', woreda: '' });
       loadData();
     } catch (e: any) { setError(e.message); } finally { setSaving(false); }
   };
@@ -137,6 +140,14 @@ export default function UserManagement() {
       loadData();
     } catch (e: any) { alert(e.message); }
   };
+
+  const needsRegion = ['region_admin', 'zone_admin', 'district_admin'].includes(newUser.role);
+  const needsZone = ['zone_admin', 'district_admin'].includes(newUser.role);
+  const needsWoreda = newUser.role === 'district_admin';
+
+  const editNeedsRegion = ['region_admin', 'zone_admin', 'district_admin'].includes(formData.role);
+  const editNeedsZone = ['zone_admin', 'district_admin'].includes(formData.role);
+  const editNeedsWoreda = formData.role === 'district_admin';
 
   const getRoleBadgeVariant = (role: string): "default" | "secondary" | "destructive" | "outline" | "success" | "warning" => {
     switch (role) {
@@ -245,7 +256,13 @@ export default function UserManagement() {
             </div>
             <div className="space-y-2">
               <Label>Role</Label>
-              <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+              <Select value={formData.role} onValueChange={(value) => {
+                const next = { ...formData, role: value };
+                // Prefill the editor's scope so promoted admins stay inside it
+                if (['zone_admin', 'district_admin'].includes(value) && !next.region) next.region = user?.region || '';
+                if (value === 'district_admin' && !next.zone) next.zone = user?.zone || '';
+                setFormData(next);
+              }}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -254,18 +271,38 @@ export default function UserManagement() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Facility</Label>
-              <Select value={formData.facility_id} onValueChange={(value) => setFormData({ ...formData, facility_id: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="None" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">None</SelectItem>
-                  {facilities.map((f) => <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            {editNeedsRegion && (
+              <div className="space-y-2">
+                <Label>Region *</Label>
+                <Input value={formData.region} onChange={(e) => setFormData({ ...formData, region: e.target.value })} placeholder="e.g. Oromia" />
+              </div>
+            )}
+            {editNeedsZone && (
+              <div className="space-y-2">
+                <Label>Zone *</Label>
+                <Input value={formData.zone} onChange={(e) => setFormData({ ...formData, zone: e.target.value })} placeholder="e.g. East Hararghe" />
+              </div>
+            )}
+            {editNeedsWoreda && (
+              <div className="space-y-2">
+                <Label>Woreda *</Label>
+                <Input value={formData.woreda} onChange={(e) => setFormData({ ...formData, woreda: e.target.value })} placeholder="e.g. Gursum" />
+              </div>
+            )}
+            {['facility_admin', 'facility_user'].includes(formData.role) && (
+              <div className="space-y-2">
+                <Label>Facility</Label>
+                <Select value={formData.facility_id} onValueChange={(value) => setFormData({ ...formData, facility_id: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {facilities.map((f) => <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <input type="checkbox" id="edit-active" checked={formData.is_active} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} className="rounded border-gray-300" />
               <Label htmlFor="edit-active">Active</Label>
@@ -273,7 +310,7 @@ export default function UserManagement() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
-            <Button onClick={handleUpdate} disabled={saving}>
+            <Button onClick={handleUpdate} disabled={saving || (editNeedsRegion && !formData.region) || (editNeedsZone && !formData.zone) || (editNeedsWoreda && !formData.woreda)}>
               {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'Update'}
             </Button>
           </DialogFooter>
@@ -307,7 +344,13 @@ export default function UserManagement() {
             </div>
             <div className="space-y-2">
               <Label>Role</Label>
-              <Select value={newUser.role} onValueChange={(value) => setNewUser({ ...newUser, role: value })}>
+              <Select value={newUser.role} onValueChange={(value) => {
+                const next = { ...newUser, role: value };
+                // Prefill the creator's scope so newly registered admins are correctly limited
+                if (['zone_admin', 'district_admin'].includes(value) && !next.region) next.region = user?.region || '';
+                if (value === 'district_admin' && !next.zone) next.zone = user?.zone || '';
+                setNewUser(next);
+              }}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -316,22 +359,42 @@ export default function UserManagement() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Facility</Label>
-              <Select value={newUser.facility_id} onValueChange={(value) => setNewUser({ ...newUser, facility_id: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="None" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">None</SelectItem>
-                  {facilities.map((f) => <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
+            {needsRegion && (
+              <div className="space-y-2">
+                <Label>Region *</Label>
+                <Input value={newUser.region} onChange={(e) => setNewUser({ ...newUser, region: e.target.value })} placeholder="e.g. Oromia" />
+              </div>
+            )}
+            {needsZone && (
+              <div className="space-y-2">
+                <Label>Zone *</Label>
+                <Input value={newUser.zone} onChange={(e) => setNewUser({ ...newUser, zone: e.target.value })} placeholder="e.g. East Hararghe" />
+              </div>
+            )}
+            {needsWoreda && (
+              <div className="space-y-2">
+                <Label>Woreda *</Label>
+                <Input value={newUser.woreda} onChange={(e) => setNewUser({ ...newUser, woreda: e.target.value })} placeholder="e.g. Gursum" />
+              </div>
+            )}
+            {['facility_admin', 'facility_user'].includes(newUser.role) && (
+              <div className="space-y-2">
+                <Label>Facility</Label>
+                <Select value={newUser.facility_id} onValueChange={(value) => setNewUser({ ...newUser, facility_id: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {facilities.map((f) => <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={saving || !newUser.username || !newUser.email || !newUser.password || !newUser.full_name}>
+            <Button onClick={handleCreate} disabled={saving || !newUser.username || !newUser.email || !newUser.password || !newUser.full_name || (needsRegion && !newUser.region) || (needsZone && !newUser.zone) || (needsWoreda && !newUser.woreda)}>
               {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'Create User'}
             </Button>
           </DialogFooter>
