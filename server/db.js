@@ -132,4 +132,7 @@ export const sql = {
   nowWeek() {
     return isPostgres ? `to_char(NOW(), 'IYYY-IW')` : `strftime('%Y-%W', 'now')`;
   },
+  like(col, param) {
+    return isPostgres ? `${col} ILIKE ${param}` : `${col} LIKE ${param}`;
+  },
 };

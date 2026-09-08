@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { queryOne, queryAll, run, boolCol, boolParam } from '../db.js';
+import { queryOne, queryAll, run, boolCol, boolParam, isActive } from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();

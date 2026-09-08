@@ -44,7 +44,7 @@ router.get('/', authenticateToken, async (req, res) => {
       paramIndex = params.length + 1;
     }
 
-    if (search) { where += ` AND c.patient_name LIKE $${paramIndex++}`; params.push(`%${search}%`); }
+    if (search) { where += ` AND ${sql.like('c.patient_name', `$${paramIndex++}`)}`; params.push(`%${search}%`); }
     if (region) { where += ` AND c.reporting_region = $${paramIndex++}`; params.push(region); }
     if (zone) { where += ` AND c.zone = $${paramIndex++}`; params.push(zone); }
     if (woreda) { where += ` AND c.woreda = $${paramIndex++}`; params.push(woreda); }
@@ -146,7 +146,8 @@ router.get('/stats', authenticateToken, async (req, res) => {
       recent_trend: recentTrend,
     });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch stats',  });
+    console.error('Stats endpoint error:', err.message, err.stack);
+    res.status(500).json({ error: 'Failed to fetch stats' });
   }
 });
 
