@@ -133,12 +133,17 @@ export async function initDatabase() {
 
   if (isPostgres) {
     const migrations = [
-      `ALTER TABLE users ALTER COLUMN is_active TYPE BOOLEAN USING is_active::BOOLEAN`,
-      `ALTER TABLE facilities ALTER COLUMN is_active TYPE BOOLEAN USING is_active::BOOLEAN`,
-      `ALTER TABLE notifications ALTER COLUMN is_read TYPE BOOLEAN USING is_read::BOOLEAN`,
+      [`users`, `is_active`],
+      [`facilities`, `is_active`],
+      [`notifications`, `is_read`],
     ];
-    for (const sql of migrations) {
-      try { await run(sql); } catch (e) { /* column already correct type */ }
+    for (const [table, col] of migrations) {
+      try {
+        await run(`ALTER TABLE ${table} ALTER COLUMN ${col} TYPE BOOLEAN USING (CASE WHEN ${col}::text = '1' THEN true WHEN ${col}::text = '0' THEN false ELSE false END)`);
+        await run(`ALTER TABLE ${table} ALTER COLUMN ${col} SET DEFAULT ${col === 'is_read' ? 'false' : 'true'}`);
+      } catch (e) {
+        console.log(`Migration ${table}.${col}: ${e.message}`);
+      }
     }
   }
 }

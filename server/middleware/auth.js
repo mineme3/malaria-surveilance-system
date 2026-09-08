@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { queryOne } from '../db.js';
+import { queryOne, isActive } from '../db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
@@ -26,7 +26,7 @@ export async function authenticateToken(req, res, next) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const user = await queryOne(
-      'SELECT id, username, email, full_name, role, facility_id, region, zone, woreda, is_active FROM users WHERE id = $1 AND is_active = TRUE',
+      `SELECT id, username, email, full_name, role, facility_id, region, zone, woreda, is_active FROM users WHERE id = $1 AND ${isActive()}`,
       [decoded.id]
     );
     if (!user) {

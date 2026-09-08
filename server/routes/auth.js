@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { queryOne, queryAll, run, runReturning, boolParam, BOOL_TRUE, BOOL_FALSE } from '../db.js';
+import { queryOne, queryAll, run, runReturning, boolParam, isActive } from '../db.js';
 import { JWT_SECRET, authenticateToken, canManageUsers, canManageUsersMiddleware, ROLE_HIERARCHY } from '../middleware/auth.js';
 
 const router = Router();
@@ -94,7 +94,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    const user = await queryOne('SELECT * FROM users WHERE username = $1 AND is_active = TRUE', [username]);
+    const user = await queryOne(`SELECT * FROM users WHERE username = $1 AND ${isActive()}`, [username]);
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -256,9 +256,9 @@ router.put('/users/:id/toggle-active', authenticateToken, canManageUsersMiddlewa
       return res.status(400).json({ error: 'Cannot deactivate your own account' });
     }
 
-    const isActive = targetUser.is_active;
-    const activated = isActive ? false : true;
-    const newStatus = activated ? BOOL_TRUE : BOOL_FALSE;
+    const wasActive = !!targetUser.is_active;
+    const activated = !wasActive;
+    const newStatus = activated ? boolParam(true) : boolParam(false);
     await run('UPDATE users SET is_active = $1 WHERE id = $2', [newStatus, req.params.id]);
 
     await run(
@@ -299,7 +299,7 @@ router.delete('/users/:id', authenticateToken, canManageUsersMiddleware, async (
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
-    await run(`UPDATE users SET is_active = ${BOOL_FALSE} WHERE id = $1`, [req.params.id]);
+    await run('UPDATE users SET is_active = $1 WHERE id = $2', [boolParam(false), req.params.id]);
 
     await run(
       `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)

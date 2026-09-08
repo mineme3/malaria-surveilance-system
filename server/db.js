@@ -8,8 +8,13 @@ let sqliteDb = null;
 
 if (DATABASE_URL) {
   const { Pool } = await import('pg');
-  const cleanUrl = DATABASE_URL.replace(/sslmode=[^&]+/, 'sslmode=require');
-  pool = new Pool({ connectionString: cleanUrl });
+  const url = new URL(DATABASE_URL);
+  const sslmode = url.searchParams.get('sslmode') || 'require';
+  url.searchParams.delete('sslmode');
+  pool = new Pool({
+    connectionString: url.toString(),
+    ssl: sslmode === 'disable' ? false : { rejectUnauthorized: false },
+  });
   console.log('Connected to PostgreSQL database');
 } else {
   // SQLite mode (local development)
@@ -86,9 +91,18 @@ export default pool || sqliteDb;
 
 const isPostgres = !!pool;
 
-export const BOOL_TRUE = isPostgres ? 'TRUE' : '1';
-export const BOOL_FALSE = isPostgres ? 'FALSE' : '0';
+export const BOOL_TRUE = isPostgres ? 'true' : '1';
+export const BOOL_FALSE = isPostgres ? 'false' : '0';
 export function boolParam(val) { return val ? (isPostgres ? true : 1) : (isPostgres ? false : 0); }
+
+export function isActive(col = 'is_active') {
+  if (!isPostgres) return `${col} = 1`;
+  return `(${col}::text IN ('1','true','t','yes'))`;
+}
+export function isNotActive(col = 'is_active') {
+  if (!isPostgres) return `${col} = 0`;
+  return `(${col}::text IN ('0','false','f','no'))`;
+}
 
 export const sql = {
   dateTruncMonth(col) {

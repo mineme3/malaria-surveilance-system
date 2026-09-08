@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import { queryOne, queryAll, run, runReturning, BOOL_TRUE, BOOL_FALSE, boolParam } from '../db.js';
+import { queryOne, queryAll, run, runReturning, boolParam, isActive } from '../db.js';
 import { authenticateToken, buildFacilityScope, canManageFacilitiesMiddleware } from '../middleware/auth.js';
 
 const router = Router();
@@ -26,7 +26,7 @@ router.get('/all', authenticateToken, async (req, res) => {
     const scope = buildFacilityScope(req.user);
     const scopeWhere = scope.where ? scope.where.replace(/^ WHERE/, ' AND') : '';
     const facilities = await queryAll(
-      `SELECT id, name, region, zone, woreda FROM facilities WHERE is_active = ${BOOL_TRUE}${scopeWhere} ORDER BY name`,
+      `SELECT id, name, region, zone, woreda FROM facilities WHERE ${isActive()}${scopeWhere} ORDER BY name`,
       scope.params
     );
     res.json(facilities);
@@ -236,7 +236,7 @@ router.delete('/:id', authenticateToken, canManageFacilitiesMiddleware, async (r
       }
     }
 
-    await run(`UPDATE facilities SET is_active = ${BOOL_FALSE} WHERE id = $1`, [req.params.id]);
+    await run('UPDATE facilities SET is_active = $1 WHERE id = $2', [boolParam(false), req.params.id]);
 
     await run(
       `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)

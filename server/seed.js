@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { queryOne, queryAll, run, runReturning, BOOL_TRUE } from './db.js';
+import { queryOne, queryAll, run, runReturning, isActive } from './db.js';
 
 const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pick = (arr) => arr[rand(0, arr.length - 1)];
@@ -167,7 +167,7 @@ export async function seedDatabase() {
     console.log('Admin user already exists, skipping base seed');
   }
 
-  const facilities = await queryAll(`SELECT id, name FROM facilities WHERE is_active = ${BOOL_TRUE} ORDER BY id`);
+  const facilities = await queryAll(`SELECT id, name FROM facilities WHERE ${isActive()} ORDER BY id`);
   const users = await queryAll("SELECT id, username FROM users WHERE role = 'facility_user' ORDER BY id");
   const adminUser = await queryOne("SELECT id FROM users WHERE username = 'admin' LIMIT 1");
   const adminId = adminUser?.id || 1;
