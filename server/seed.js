@@ -111,14 +111,14 @@ function generateCase(epiWeek, facilityId, userId, facilityName) {
 }
 
 export async function seedDatabase() {
-  const adminExists = queryOne('SELECT id FROM users WHERE username = ?', ['admin']);
+  const adminExists = await queryOne('SELECT id FROM users WHERE username = $1', ['admin']);
 
   if (!adminExists) {
     console.log('Running initial seed (admin user not found)...');
     const hash = bcrypt.hashSync('admin123', 10);
 
-    const admin = runReturning(
-      'INSERT INTO users (username, email, password_hash, full_name, role, region, zone, woreda) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    const admin = await runReturning(
+      'INSERT INTO users (username, email, password_hash, full_name, role, region, zone, woreda) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
       ['admin', 'admin@malaria.gov', hash, 'System Administrator', 'system_admin', 'DD', 'DD', 'DD']
     );
     const adminId = admin?.id || 1;
@@ -135,8 +135,8 @@ export async function seedDatabase() {
 
     const facilityIds = [];
     for (const f of facilities) {
-      const rec = runReturning(
-        'INSERT INTO facilities (name, region, zone, woreda, kebele, facility_type, phone) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      const rec = await runReturning(
+        'INSERT INTO facilities (name, region, zone, woreda, kebele, facility_type, phone) VALUES ($1, $2, $3, $4, $5, $6, $7)',
         [f.name, f.region, f.zone, f.woreda, f.kebele, f.type, f.phone]
       );
       facilityIds.push(rec?.id);
@@ -155,8 +155,8 @@ export async function seedDatabase() {
     ];
 
     for (const u of usersData) {
-      run(
-        'INSERT INTO users (username, email, password_hash, full_name, role, facility_id, region, zone, woreda) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      await run(
+        'INSERT INTO users (username, email, password_hash, full_name, role, facility_id, region, zone, woreda) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)',
         [u.username, `${u.username}@malaria.gov`, hash, u.full_name, u.role, u.facility_id || null, u.region, u.zone, u.woreda]
       );
       console.log(`  User created: ${u.username} (${u.full_name})`);
@@ -167,12 +167,12 @@ export async function seedDatabase() {
     console.log('Admin user already exists, skipping base seed');
   }
 
-  const facilities = queryAll('SELECT id, name FROM facilities WHERE is_active = 1 ORDER BY id');
-  const users = queryAll('SELECT id, username FROM users WHERE role = \'facility_user\' ORDER BY id');
-  const adminUser = queryOne('SELECT id FROM users WHERE username = \'admin\' LIMIT 1');
+  const facilities = await queryAll('SELECT id, name FROM facilities WHERE is_active = 1 ORDER BY id');
+  const users = await queryAll("SELECT id, username FROM users WHERE role = 'facility_user' ORDER BY id");
+  const adminUser = await queryOne("SELECT id FROM users WHERE username = 'admin' LIMIT 1");
   const adminId = adminUser?.id || 1;
 
-  const existingCount = queryOne('SELECT COUNT(*) as cnt FROM malaria_cases');
+  const existingCount = await queryOne('SELECT COUNT(*) as cnt FROM malaria_cases');
   const currentCount = parseInt(existingCount?.cnt || '0', 10);
 
   const TARGET_CASE_COUNT = 50;
@@ -193,14 +193,14 @@ export async function seedDatabase() {
         const c = generateCase(week, facility.id, user?.id || adminId, facility.name);
 
         try {
-          run(
+          await run(
             `INSERT INTO malaria_cases (client_side_id, facility_id, reporting_region, zone, woreda,
               reporting_hf, kebele, house_no, mobile_phone, admission_type,
               patient_name, sex, age, epi_week, age_category, date_of_onset, date_seen,
               fever, headache, joint_pain, chills_rigor, vomiting, back_pain, other_symptoms,
               specimen_taken, haemoparasite_spp, travel_history, travel_to_malaria_area,
               outcome, ftat_done, referred_facility, source_of_infection, created_by)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32, $33)`,
             [c.client_side_id, c.facility_id, c.reporting_region, c.zone, c.woreda,
              c.reporting_hf, c.kebele, c.house_no, c.mobile_phone, c.admission_type,
              c.patient_name, c.sex, c.age, c.epi_week, c.age_category, c.date_of_onset, c.date_seen,
@@ -217,7 +217,7 @@ export async function seedDatabase() {
     console.log(`Inserted ${inserted} realistic malaria cases`);
   }
 
-  const auditCount = queryOne('SELECT COUNT(*) as cnt FROM audit_logs');
+  const auditCount = await queryOne('SELECT COUNT(*) as cnt FROM audit_logs');
   if (parseInt(auditCount?.cnt || '0', 10) < 5) {
     console.log('Seeding audit logs...');
     const auditActions = [
@@ -228,8 +228,8 @@ export async function seedDatabase() {
       { action: 'view_dashboard', entity: 'dashboard' },
     ];
     for (const a of auditActions) {
-      run(
-        'INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details) VALUES (?, ?, ?, ?, ?)',
+      await run(
+        'INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details) VALUES ($1, $2, $3, $4, $5)',
         [adminId, a.action, a.entity, 1, 'Seeded during database initialization']
       );
     }
@@ -238,10 +238,10 @@ export async function seedDatabase() {
     console.log(`Audit logs already present (${auditCount?.cnt})`);
   }
 
-  const notifCount = queryOne('SELECT COUNT(*) as cnt FROM notifications');
+  const notifCount = await queryOne('SELECT COUNT(*) as cnt FROM notifications');
   if (parseInt(notifCount?.cnt || '0', 10) < 5) {
     console.log('Seeding notifications...');
-    const allUsers = queryAll('SELECT id FROM users ORDER BY id');
+    const allUsers = await queryAll('SELECT id FROM users ORDER BY id');
     const notificationTemplates = [
       { title: 'Weekly Report Available', message: 'The epi week 31 surveillance report is now available for review.', type: 'info' },
       { title: 'Data Import Complete', message: 'Bulk import of 25 case records has been completed successfully.', type: 'info' },
@@ -251,9 +251,9 @@ export async function seedDatabase() {
     ];
     for (const notif of notificationTemplates) {
       for (const user of allUsers) {
-        run(
-          'INSERT INTO notifications (user_id, title, message, type, is_read) VALUES (?, ?, ?, ?, ?)',
-          [user.id, notif.title, notif.message, notif.type, 0]
+        await run(
+          'INSERT INTO notifications (user_id, title, message, type, is_read) VALUES ($1, $2, $3, $4, $5)',
+          [user.id, notif.title, notif.message, notif.type, false]
         );
       }
     }

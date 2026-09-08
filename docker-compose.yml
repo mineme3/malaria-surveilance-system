@@ -1,4 +1,20 @@
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: malaria-db
+    environment:
+      POSTGRES_DB: malaria_pwa
+      POSTGRES_USER: malaria
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-malaria_secret_2024}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U malaria -d malaria_pwa"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   malaria-pwa:
     build: .
     container_name: malaria-pwa
@@ -6,7 +22,13 @@ services:
       - "3001:3001"
     environment:
       - PORT=3001
-      - JWT_SECRET=malaria-pwa-secret-key-change-in-production
+      - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
       - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://malaria:${DB_PASSWORD:-malaria_secret_2024}@db:5432/malaria_pwa
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  pgdata:

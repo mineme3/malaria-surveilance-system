@@ -1,9 +1,16 @@
 import { query, run } from './db.js';
 
+const isPostgres = !!process.env.DATABASE_URL;
+
 export async function initDatabase() {
+  const SERIAL = isPostgres ? 'SERIAL' : 'INTEGER';
+  const AUTOINCREMENT = isPostgres ? '' : 'AUTOINCREMENT';
+  const BOOL_DEFAULT = isPostgres ? 'BOOLEAN DEFAULT true' : 'INTEGER DEFAULT 1';
+  const BOOL_FALSE = isPostgres ? 'BOOLEAN DEFAULT false' : 'INTEGER DEFAULT 0';
+
   await run(`
     CREATE TABLE IF NOT EXISTS facilities (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id ${SERIAL} PRIMARY KEY,
       name TEXT NOT NULL,
       region TEXT NOT NULL,
       zone TEXT NOT NULL,
@@ -11,14 +18,14 @@ export async function initDatabase() {
       kebele TEXT DEFAULT '',
       facility_type TEXT DEFAULT 'Health Center',
       phone TEXT DEFAULT '',
-      is_active INTEGER DEFAULT 1,
+      is_active ${BOOL_DEFAULT},
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
   await run(`
     CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id ${SERIAL} PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password_hash TEXT NOT NULL,
@@ -28,14 +35,14 @@ export async function initDatabase() {
       region TEXT DEFAULT '',
       zone TEXT DEFAULT '',
       woreda TEXT DEFAULT '',
-      is_active INTEGER DEFAULT 1,
+      is_active ${BOOL_DEFAULT},
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
   await run(`
     CREATE TABLE IF NOT EXISTS malaria_cases (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id ${SERIAL} PRIMARY KEY,
       client_side_id TEXT UNIQUE DEFAULT '',
       facility_id INTEGER NOT NULL REFERENCES facilities(id),
       reporting_region TEXT DEFAULT '',
@@ -75,14 +82,15 @@ export async function initDatabase() {
     )
   `);
 
-  try {
-    await run(`ALTER TABLE malaria_cases ADD COLUMN client_side_id TEXT DEFAULT ''`);
-    await run(`CREATE INDEX IF NOT EXISTS idx_cases_client_id ON malaria_cases(client_side_id)`);
-  } catch (e) { }
+  if (!isPostgres) {
+    try {
+      await run(`ALTER TABLE malaria_cases ADD COLUMN client_side_id TEXT DEFAULT ''`);
+    } catch (e) { }
+  }
 
   await run(`
     CREATE TABLE IF NOT EXISTS audit_logs (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id ${SERIAL} PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id),
       action TEXT NOT NULL,
       entity_type TEXT NOT NULL,
@@ -95,26 +103,31 @@ export async function initDatabase() {
 
   await run(`
     CREATE TABLE IF NOT EXISTS notifications (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id ${SERIAL} PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id),
       title TEXT NOT NULL,
       message TEXT NOT NULL,
       type TEXT DEFAULT 'info',
-      is_read INTEGER DEFAULT 0,
+      is_read ${BOOL_FALSE},
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
-  await run(`CREATE INDEX IF NOT EXISTS idx_cases_facility ON malaria_cases(facility_id)`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_cases_date ON malaria_cases(date_seen)`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_cases_week ON malaria_cases(epi_week)`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_cases_region ON malaria_cases(reporting_region)`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_cases_zone ON malaria_cases(zone)`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_cases_woreda ON malaria_cases(woreda)`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_users_region ON users(region)`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_users_zone ON users(zone)`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_users_woreda ON users(woreda)`);
-  await run(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id)`);
+  const idx = isPostgres
+    ? `CREATE INDEX IF NOT EXISTS`
+    : `CREATE INDEX IF NOT EXISTS`;
 
-  console.log('Database tables and indexes created successfully');
+  await run(`${idx} idx_cases_client_id ON malaria_cases(client_side_id)`);
+  await run(`${idx} idx_cases_facility ON malaria_cases(facility_id)`);
+  await run(`${idx} idx_cases_date ON malaria_cases(date_seen)`);
+  await run(`${idx} idx_cases_week ON malaria_cases(epi_week)`);
+  await run(`${idx} idx_cases_region ON malaria_cases(reporting_region)`);
+  await run(`${idx} idx_cases_zone ON malaria_cases(zone)`);
+  await run(`${idx} idx_cases_woreda ON malaria_cases(woreda)`);
+  await run(`${idx} idx_users_region ON users(region)`);
+  await run(`${idx} idx_users_zone ON users(zone)`);
+  await run(`${idx} idx_users_woreda ON users(woreda)`);
+  await run(`${idx} idx_notifications_user ON notifications(user_id)`);
+
+  console.log(`Database tables and indexes created successfully (${isPostgres ? 'PostgreSQL' : 'SQLite'})`);
 }
