@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { queryOne, queryAll, run, runReturning } from '../db.js';
+import { queryOne, queryAll, run, runReturning, boolParam, BOOL_TRUE, BOOL_FALSE } from '../db.js';
 import { JWT_SECRET, authenticateToken, canManageUsers, canManageUsersMiddleware, ROLE_HIERARCHY } from '../middleware/auth.js';
 
 const router = Router();
@@ -94,7 +94,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({ error: 'Username and password are required' });
     }
 
-    const user = await queryOne('SELECT * FROM users WHERE username = $1 AND is_active = 1', [username]);
+    const user = await queryOne('SELECT * FROM users WHERE username = $1 AND is_active = TRUE', [username]);
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
@@ -211,7 +211,7 @@ router.put('/users/:id', authenticateToken, canManageUsersMiddleware, async (req
 
     await run(
       'UPDATE users SET username = $1, full_name = $2, role = $3, is_active = $4, facility_id = $5 WHERE id = $6',
-      [username || targetUser.username, full_name || targetUser.full_name, role || targetUser.role, is_active !== undefined ? (is_active ? 1 : 0) : targetUser.is_active, facility_id || targetUser.facility_id, req.params.id]
+      [username || targetUser.username, full_name || targetUser.full_name, role || targetUser.role, is_active !== undefined ? boolParam(is_active) : targetUser.is_active, facility_id || targetUser.facility_id, req.params.id]
     );
 
     const details = username && username !== targetUser.username
@@ -256,16 +256,18 @@ router.put('/users/:id/toggle-active', authenticateToken, canManageUsersMiddlewa
       return res.status(400).json({ error: 'Cannot deactivate your own account' });
     }
 
-    const newStatus = targetUser.is_active ? 0 : 1;
+    const isActive = targetUser.is_active;
+    const activated = isActive ? false : true;
+    const newStatus = activated ? BOOL_TRUE : BOOL_FALSE;
     await run('UPDATE users SET is_active = $1 WHERE id = $2', [newStatus, req.params.id]);
 
     await run(
       `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)
        VALUES ($1, 'update', 'user', $2, $3)`,
-      [req.user.id, req.params.id, `${newStatus ? 'Activated' : 'Deactivated'} user: ${targetUser.username}`]
+      [req.user.id, req.params.id, `${activated ? 'Activated' : 'Deactivated'} user: ${targetUser.username}`]
     );
 
-    res.json({ message: `User ${newStatus ? 'activated' : 'deactivated'}`, is_active: newStatus });
+    res.json({ message: `User ${activated ? 'activated' : 'deactivated'}`, is_active: activated });
   } catch (err) {
     res.status(500).json({ error: 'Failed to toggle user status' });
   }
@@ -297,7 +299,7 @@ router.delete('/users/:id', authenticateToken, canManageUsersMiddleware, async (
       return res.status(400).json({ error: 'Cannot delete your own account' });
     }
 
-    await run('UPDATE users SET is_active = 0 WHERE id = $1', [req.params.id]);
+    await run(`UPDATE users SET is_active = ${BOOL_FALSE} WHERE id = $1`, [req.params.id]);
 
     await run(
       `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)

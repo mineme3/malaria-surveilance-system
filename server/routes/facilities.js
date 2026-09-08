@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import { queryOne, queryAll, run, runReturning } from '../db.js';
+import { queryOne, queryAll, run, runReturning, BOOL_TRUE, BOOL_FALSE, boolParam } from '../db.js';
 import { authenticateToken, buildFacilityScope, canManageFacilitiesMiddleware } from '../middleware/auth.js';
 
 const router = Router();
@@ -26,7 +26,7 @@ router.get('/all', authenticateToken, async (req, res) => {
     const scope = buildFacilityScope(req.user);
     const scopeWhere = scope.where ? scope.where.replace(/^ WHERE/, ' AND') : '';
     const facilities = await queryAll(
-      `SELECT id, name, region, zone, woreda FROM facilities WHERE is_active = 1${scopeWhere} ORDER BY name`,
+      `SELECT id, name, region, zone, woreda FROM facilities WHERE is_active = ${BOOL_TRUE}${scopeWhere} ORDER BY name`,
       scope.params
     );
     res.json(facilities);
@@ -204,7 +204,7 @@ router.put('/:id', authenticateToken, canManageFacilitiesMiddleware, async (req,
     const { name, region, zone, woreda, kebele, facility_type, phone, is_active } = req.body;
     await run(
       'UPDATE facilities SET name=$1, region=$2, zone=$3, woreda=$4, kebele=$5, facility_type=$6, phone=$7, is_active=$8 WHERE id=$9',
-      [name, region, zone, woreda, kebele || '', facility_type || 'Health Center', phone || '', is_active ? 1 : 0, req.params.id]
+      [name, region, zone, woreda, kebele || '', facility_type || 'Health Center', phone || '', boolParam(is_active), req.params.id]
     );
 
     await run(
@@ -236,7 +236,7 @@ router.delete('/:id', authenticateToken, canManageFacilitiesMiddleware, async (r
       }
     }
 
-    await run('UPDATE facilities SET is_active = 0 WHERE id = $1', [req.params.id]);
+    await run(`UPDATE facilities SET is_active = ${BOOL_FALSE} WHERE id = $1`, [req.params.id]);
 
     await run(
       `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details)

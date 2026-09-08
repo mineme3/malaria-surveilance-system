@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { queryOne, queryAll, run } from '../db.js';
+import { queryOne, queryAll, run, BOOL_TRUE } from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
@@ -62,7 +62,7 @@ router.post('/send', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'Title and message are required' });
     }
 
-    let where = 'WHERE is_active = 1';
+    let where = `WHERE is_active = ${BOOL_TRUE}`;
     const params = [];
     let paramIndex = 1;
 

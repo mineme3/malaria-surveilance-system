@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { queryOne, queryAll, run, runReturning, sql } from '../db.js';
+import { queryOne, queryAll, run, runReturning, sql, BOOL_TRUE } from '../db.js';
 import { authenticateToken, buildDataScope, canModifyCase } from '../middleware/auth.js';
 
 const router = Router();
@@ -14,7 +14,7 @@ function getCurrentEpiWeek() {
 async function createAlert(user, type, title, message) {
   try {
     const admins = await queryAll(
-      `SELECT id FROM users WHERE role IN ('system_admin','region_admin','zone_admin','district_admin') AND is_active = 1`
+      `SELECT id FROM users WHERE role IN ('system_admin','region_admin','zone_admin','district_admin') AND is_active = ${BOOL_TRUE}`
     );
     for (const admin of admins) {
       await run('INSERT INTO notifications (user_id, title, message, type) VALUES ($1, $2, $3, $4)',
@@ -668,7 +668,7 @@ router.post('/generate', authenticateToken, async (req, res) => {
     const { count = 20 } = req.body;
     const numCases = Math.min(parseInt(count) || 20, 200);
 
-    const facilities = await queryAll('SELECT id, name, region, zone, woreda, kebele FROM facilities WHERE is_active = 1');
+    const facilities = await queryAll(`SELECT id, name, region, zone, woreda, kebele FROM facilities WHERE is_active = ${BOOL_TRUE}`);
     const users = await queryAll("SELECT id FROM users WHERE role = 'facility_user'");
 
     if (facilities.length === 0) {

@@ -26,7 +26,7 @@ export async function authenticateToken(req, res, next) {
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
     const user = await queryOne(
-      'SELECT id, username, email, full_name, role, facility_id, region, zone, woreda, is_active FROM users WHERE id = $1 AND is_active = 1',
+      'SELECT id, username, email, full_name, role, facility_id, region, zone, woreda, is_active FROM users WHERE id = $1 AND is_active = TRUE',
       [decoded.id]
     );
     if (!user) {

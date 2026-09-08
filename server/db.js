@@ -86,6 +86,10 @@ export default pool || sqliteDb;
 
 const isPostgres = !!pool;
 
+export const BOOL_TRUE = isPostgres ? 'TRUE' : '1';
+export const BOOL_FALSE = isPostgres ? 'FALSE' : '0';
+export function boolParam(val) { return val ? (isPostgres ? true : 1) : (isPostgres ? false : 0); }
+
 export const sql = {
   dateTruncMonth(col) {
     return isPostgres ? `to_char(${col}::date, 'YYYY-MM')` : `strftime('%Y-%m', ${col})`;
