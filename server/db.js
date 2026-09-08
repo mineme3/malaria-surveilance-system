@@ -1,30 +1,52 @@
-import { neon } from '@neondatabase/serverless';
+import { fileURLToPath } from 'url';
+import path from 'path';
+import Database from 'better-sqlite3';
 
-const sql = neon(process.env.DATABASE_URL);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-export async function query(text, params = []) {
-  const result = await sql.query(text, params);
-  return result;
+const dbPath = path.join(__dirname, 'malaria.db');
+const db = new Database(dbPath);
+
+db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
+
+function convertPlaceholders(text) {
+  return text.replace(/\$\d+/g, () => '?');
 }
 
-export async function queryOne(text, params = []) {
-  const result = await sql.query(text, params);
-  return result[0] || null;
+function run(text, params = []) {
+  const converted = convertPlaceholders(text);
+  const stmt = db.prepare(converted);
+  const result = stmt.run(...params);
+  return { rowCount: result.changes, rows: [] };
 }
 
-export async function queryAll(text, params = []) {
-  const result = await sql.query(text, params);
-  return result;
+function runReturning(text, params = []) {
+  const converted = convertPlaceholders(text);
+  const stmt = db.prepare(converted);
+  const result = stmt.run(...params);
+  if (result.lastInsertRowid) {
+    return { id: Number(result.lastInsertRowid) };
+  }
+  return null;
 }
 
-export async function run(text, params = []) {
-  const result = await sql.query(text, params);
-  return { rowCount: result.length, rows: result };
+function query(text, params = []) {
+  const converted = convertPlaceholders(text);
+  const stmt = db.prepare(converted);
+  return stmt.all(...params);
 }
 
-export async function runReturning(text, params = []) {
-  const result = await sql.query(text, params);
-  return result[0] || null;
+function queryOne(text, params = []) {
+  const converted = convertPlaceholders(text);
+  const stmt = db.prepare(converted);
+  return stmt.get(...params) || null;
 }
 
-export default sql;
+function queryAll(text, params = []) {
+  return query(text, params);
+}
+
+export { query, queryOne, queryAll, run, runReturning };
+export default db;

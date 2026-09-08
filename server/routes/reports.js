@@ -95,11 +95,11 @@ router.get('/generate', authenticateToken, async (req, res) => {
     // Trend data for weekly/monthly/yearly
     let trendData = [];
     if (type === 'weekly') {
-      trendData = await queryAll(`SELECT TO_CHAR(c.date_seen::date, 'YYYY-WW') as period, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
+      trendData = await queryAll(`SELECT strftime('%Y-%W', c.date_seen) as period, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
     } else if (type === 'monthly') {
-      trendData = await queryAll(`SELECT TO_CHAR(c.date_seen::date, 'YYYY-MM') as period, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
+      trendData = await queryAll(`SELECT strftime('%Y-%m', c.date_seen) as period, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
     } else if (type === 'annual') {
-      trendData = await queryAll(`SELECT EXTRACT(YEAR FROM c.date_seen::date)::text as period, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
+      trendData = await queryAll(`SELECT strftime('%Y', c.date_seen) as period, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
     }
 
     const report = {

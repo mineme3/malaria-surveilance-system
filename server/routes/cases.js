@@ -44,7 +44,7 @@ router.get('/', authenticateToken, async (req, res) => {
       paramIndex = params.length + 1;
     }
 
-    if (search) { where += ` AND c.patient_name ILIKE $${paramIndex++}`; params.push(`%${search}%`); }
+    if (search) { where += ` AND c.patient_name LIKE $${paramIndex++}`; params.push(`%${search}%`); }
     if (region) { where += ` AND c.reporting_region = $${paramIndex++}`; params.push(region); }
     if (zone) { where += ` AND c.zone = $${paramIndex++}`; params.push(zone); }
     if (woreda) { where += ` AND c.woreda = $${paramIndex++}`; params.push(woreda); }
@@ -101,15 +101,15 @@ router.get('/stats', authenticateToken, async (req, res) => {
     const weekParam = paramIndex++;
     const thisWeek = parseInt((await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${baseWhere} AND c.epi_week = $${weekParam}`, [...baseParams, thisWeekNum])).count);
 
-    const thisMonth = parseInt((await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${baseWhere} AND TO_CHAR(c.date_seen::date, 'YYYY-MM') = TO_CHAR(NOW()::date, 'YYYY-MM')`, baseParams)).count);
+    const thisMonth = parseInt((await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${baseWhere} AND strftime('%Y-%m', c.date_seen) = strftime('%Y-%m', 'now')`, baseParams)).count);
 
-    const thisYear = parseInt((await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${baseWhere} AND EXTRACT(YEAR FROM c.date_seen::date) = EXTRACT(YEAR FROM NOW()::date)`, baseParams)).count);
+    const thisYear = parseInt((await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${baseWhere} AND strftime('%Y', c.date_seen) = strftime('%Y', 'now')`, baseParams)).count);
 
     const deaths = parseInt((await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${baseWhere} AND c.outcome = 'Death'`, baseParams)).count);
 
-    const facilitiesReporting = parseInt((await queryOne(`SELECT COUNT(DISTINCT c.facility_id) as count FROM malaria_cases c ${baseWhere} AND TO_CHAR(c.date_seen::date, 'YYYY-MM') = TO_CHAR(NOW()::date, 'YYYY-MM')`, baseParams)).count);
+    const facilitiesReporting = parseInt((await queryOne(`SELECT COUNT(DISTINCT c.facility_id) as count FROM malaria_cases c ${baseWhere} AND strftime('%Y-%m', c.date_seen) = strftime('%Y-%m', 'now')`, baseParams)).count);
 
-    const casesByWeek = await queryAll(`SELECT c.epi_week as week, COUNT(*) as count FROM malaria_cases c ${baseWhere} AND EXTRACT(YEAR FROM c.date_seen::date) = EXTRACT(YEAR FROM NOW()::date) GROUP BY c.epi_week ORDER BY c.epi_week`, baseParams);
+    const casesByWeek = await queryAll(`SELECT c.epi_week as week, COUNT(*) as count FROM malaria_cases c ${baseWhere} AND strftime('%Y', c.date_seen) = strftime('%Y', 'now') GROUP BY c.epi_week ORDER BY c.epi_week`, baseParams);
 
     const casesByRegion = await queryAll(`SELECT c.reporting_region as region, COUNT(*) as count FROM malaria_cases c ${baseWhere} AND c.reporting_region != '' GROUP BY c.reporting_region ORDER BY count DESC`, baseParams);
 
@@ -338,7 +338,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
         admission_type=$8, patient_name=$9, sex=$10, age=$11, epi_week=$12, age_category=$13, date_of_onset=$14, date_seen=$15,
         fever=$16, headache=$17, joint_pain=$18, chills_rigor=$19, vomiting=$20, back_pain=$21, other_symptoms=$22,
         specimen_taken=$23, haemoparasite_spp=$24, travel_history=$25, travel_to_malaria_area=$26,
-        outcome=$27, ftat_done=$28, referred_facility=$29, source_of_infection=$30, updated_at=NOW()
+        outcome=$27, ftat_done=$28, referred_facility=$29, source_of_infection=$30, updated_at=datetime('now')
        WHERE id=$31`,
       [
         data.reporting_region, data.zone, data.woreda, data.reporting_hf, data.kebele,
@@ -426,7 +426,7 @@ router.post('/sync', authenticateToken, async (req, res) => {
                   admission_type=$8, patient_name=$9, sex=$10, age=$11, epi_week=$12, age_category=$13, date_of_onset=$14, date_seen=$15,
                   fever=$16, headache=$17, joint_pain=$18, chills_rigor=$19, vomiting=$20, back_pain=$21, other_symptoms=$22,
                   specimen_taken=$23, haemoparasite_spp=$24, travel_history=$25, travel_to_malaria_area=$26,
-                  outcome=$27, ftat_done=$28, referred_facility=$29, source_of_infection=$30, updated_at=NOW()
+                  outcome=$27, ftat_done=$28, referred_facility=$29, source_of_infection=$30, updated_at=datetime('now')
                  WHERE id=$31`,
                 [
                   data.reporting_region, data.zone, data.woreda, data.reporting_hf, data.kebele,
