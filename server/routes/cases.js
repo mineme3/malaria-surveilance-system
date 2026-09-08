@@ -59,7 +59,7 @@ router.get('/', authenticateToken, async (req, res) => {
     if (admission_type) { where += ` AND c.admission_type = $${paramIndex++}`; params.push(admission_type); }
     if (haemoparasite_spp) { where += ` AND c.haemoparasite_spp = $${paramIndex++}`; params.push(haemoparasite_spp); }
 
-    const totalResult = await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${where}`, params);
+    const totalResult = await queryOne(`SELECT ${sql.count()} as count FROM malaria_cases c ${where}`, params);
     const total = parseInt(totalResult.count);
 
     const limitParam = paramIndex++;
@@ -95,37 +95,37 @@ router.get('/stats', authenticateToken, async (req, res) => {
       paramIndex = baseParams.length + 1;
     }
 
-    const totalCases = parseInt((await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${baseWhere}`, baseParams)).count);
+    const totalCases = parseInt((await queryOne(`SELECT ${sql.count()} as count FROM malaria_cases c ${baseWhere}`, baseParams)).count);
 
     const thisWeekNum = getCurrentEpiWeek();
     const weekParam = paramIndex++;
-    const thisWeek = parseInt((await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${baseWhere} AND c.epi_week = $${weekParam}`, [...baseParams, thisWeekNum])).count);
+    const thisWeek = parseInt((await queryOne(`SELECT ${sql.count()} as count FROM malaria_cases c ${baseWhere} AND c.epi_week = $${weekParam}`, [...baseParams, thisWeekNum])).count);
 
-    const thisMonth = parseInt((await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${baseWhere} AND ${sql.dateTruncMonth('c.date_seen')} = ${sql.nowMonth()}`, baseParams)).count);
+    const thisMonth = parseInt((await queryOne(`SELECT ${sql.count()} as count FROM malaria_cases c ${baseWhere} AND ${sql.dateTruncMonth('c.date_seen')} = ${sql.nowMonth()}`, baseParams)).count);
 
-    const thisYear = parseInt((await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${baseWhere} AND ${sql.dateTruncYear('c.date_seen')} = ${sql.nowYear()}`, baseParams)).count);
+    const thisYear = parseInt((await queryOne(`SELECT ${sql.count()} as count FROM malaria_cases c ${baseWhere} AND ${sql.dateTruncYear('c.date_seen')} = ${sql.nowYear()}`, baseParams)).count);
 
-    const deaths = parseInt((await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${baseWhere} AND c.outcome = 'Death'`, baseParams)).count);
+    const deaths = parseInt((await queryOne(`SELECT ${sql.count()} as count FROM malaria_cases c ${baseWhere} AND c.outcome = 'Death'`, baseParams)).count);
 
-    const facilitiesReporting = parseInt((await queryOne(`SELECT COUNT(DISTINCT c.facility_id) as count FROM malaria_cases c ${baseWhere} AND ${sql.dateTruncMonth('c.date_seen')} = ${sql.nowMonth()}`, baseParams)).count);
+    const facilitiesReporting = parseInt((await queryOne(`SELECT ${sql.countDistinct('c.facility_id')} as count FROM malaria_cases c ${baseWhere} AND ${sql.dateTruncMonth('c.date_seen')} = ${sql.nowMonth()}`, baseParams)).count);
 
-    const casesByWeek = await queryAll(`SELECT c.epi_week as week, COUNT(*) as count FROM malaria_cases c ${baseWhere} AND ${sql.dateTruncYear('c.date_seen')} = ${sql.nowYear()} GROUP BY c.epi_week ORDER BY c.epi_week`, baseParams);
+    const casesByWeek = await queryAll(`SELECT c.epi_week as week, ${sql.count()} as count FROM malaria_cases c ${baseWhere} AND ${sql.dateTruncYear('c.date_seen')} = ${sql.nowYear()} GROUP BY c.epi_week ORDER BY c.epi_week`, baseParams);
 
-    const casesByRegion = await queryAll(`SELECT c.reporting_region as region, COUNT(*) as count FROM malaria_cases c ${baseWhere} AND c.reporting_region != '' GROUP BY c.reporting_region ORDER BY count DESC`, baseParams);
+    const casesByRegion = await queryAll(`SELECT c.reporting_region as region, ${sql.count()} as count FROM malaria_cases c ${baseWhere} AND c.reporting_region != '' GROUP BY c.reporting_region ORDER BY count DESC`, baseParams);
 
-    const casesByWoreda = await queryAll(`SELECT c.woreda, COUNT(*) as count FROM malaria_cases c ${baseWhere} AND c.woreda != '' GROUP BY c.woreda ORDER BY count DESC LIMIT 10`, baseParams);
+    const casesByWoreda = await queryAll(`SELECT c.woreda, ${sql.count()} as count FROM malaria_cases c ${baseWhere} AND c.woreda != '' GROUP BY c.woreda ORDER BY count DESC LIMIT 10`, baseParams);
 
-    const casesByFacility = await queryAll(`SELECT f.name as facility_name, COUNT(*) as count FROM malaria_cases c LEFT JOIN facilities f ON c.facility_id = f.id ${baseWhere} GROUP BY c.facility_id, f.name ORDER BY count DESC LIMIT 10`, baseParams);
+    const casesByFacility = await queryAll(`SELECT f.name as facility_name, ${sql.count()} as count FROM malaria_cases c LEFT JOIN facilities f ON c.facility_id = f.id ${baseWhere} GROUP BY c.facility_id, f.name ORDER BY count DESC LIMIT 10`, baseParams);
 
-    const casesByAge = await queryAll(`SELECT c.age_category as category, COUNT(*) as count FROM malaria_cases c ${baseWhere} AND c.age_category != '' GROUP BY c.age_category ORDER BY count DESC`, baseParams);
+    const casesByAge = await queryAll(`SELECT c.age_category as category, ${sql.count()} as count FROM malaria_cases c ${baseWhere} AND c.age_category != '' GROUP BY c.age_category ORDER BY count DESC`, baseParams);
 
-    const casesBySex = await queryAll(`SELECT c.sex, COUNT(*) as count FROM malaria_cases c ${baseWhere} GROUP BY c.sex`, baseParams);
+    const casesBySex = await queryAll(`SELECT c.sex, ${sql.count()} as count FROM malaria_cases c ${baseWhere} GROUP BY c.sex`, baseParams);
 
-    const speciesDistribution = await queryAll(`SELECT c.haemoparasite_spp as species, COUNT(*) as count FROM malaria_cases c ${baseWhere} AND c.haemoparasite_spp != '' GROUP BY c.haemoparasite_spp`, baseParams);
+    const speciesDistribution = await queryAll(`SELECT c.haemoparasite_spp as species, ${sql.count()} as count FROM malaria_cases c ${baseWhere} AND c.haemoparasite_spp != '' GROUP BY c.haemoparasite_spp`, baseParams);
 
-    const casesByAdmission = await queryAll(`SELECT c.admission_type as type, COUNT(*) as count FROM malaria_cases c ${baseWhere} GROUP BY c.admission_type`, baseParams);
+    const casesByAdmission = await queryAll(`SELECT c.admission_type as type, ${sql.count()} as count FROM malaria_cases c ${baseWhere} GROUP BY c.admission_type`, baseParams);
 
-    const recentTrend = await queryAll(`SELECT c.date_seen as date, COUNT(*) as count FROM malaria_cases c ${baseWhere} GROUP BY c.date_seen ORDER BY c.date_seen DESC LIMIT 30`, baseParams);
+    const recentTrend = await queryAll(`SELECT c.date_seen as date, ${sql.count()} as count FROM malaria_cases c ${baseWhere} GROUP BY c.date_seen ORDER BY c.date_seen DESC LIMIT 30`, baseParams);
 
     res.json({
       total_cases: totalCases,
@@ -134,7 +134,7 @@ router.get('/stats', authenticateToken, async (req, res) => {
       cases_this_year: thisYear,
       deaths,
       facilities_reporting: facilitiesReporting,
-      positive_rate: totalCases > 0 ? ((parseInt((await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${baseWhere} AND c.haemoparasite_spp != ''`, baseParams)).count) / totalCases) * 100).toFixed(1) : 0,
+      positive_rate: totalCases > 0 ? ((parseInt((await queryOne(`SELECT ${sql.count()} as count FROM malaria_cases c ${baseWhere} AND c.haemoparasite_spp != ''`, baseParams)).count) / totalCases) * 100).toFixed(1) : 0,
       cases_by_week: casesByWeek,
       cases_by_region: casesByRegion,
       cases_by_woreda: casesByWoreda,

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
-import { queryOne, queryAll, run, runReturning, boolParam, isActive } from '../db.js';
+import { queryOne, queryAll, run, runReturning, boolParam, isActive, sql } from '../db.js';
 import { authenticateToken, buildFacilityScope, canManageFacilitiesMiddleware } from '../middleware/auth.js';
 
 const router = Router();
@@ -10,7 +10,7 @@ router.get('/', authenticateToken, async (req, res) => {
     const scope = buildFacilityScope(req.user);
     const facilities = await queryAll(
       `SELECT f.*,
-        (SELECT COUNT(*) FROM malaria_cases WHERE facility_id = f.id) as case_count,
+        (SELECT ${sql.count()} FROM malaria_cases WHERE facility_id = f.id) as case_count,
         (SELECT MAX(date_seen) FROM malaria_cases WHERE facility_id = f.id) as last_submission
        FROM facilities f ${scope.where} ORDER BY f.name`,
       scope.params
@@ -39,7 +39,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const facility = await queryOne(
       `SELECT f.*,
-        (SELECT COUNT(*) FROM malaria_cases WHERE facility_id = f.id) as case_count
+        (SELECT ${sql.count()} FROM malaria_cases WHERE facility_id = f.id) as case_count
        FROM facilities f WHERE f.id = $1`,
       [req.params.id]
     );

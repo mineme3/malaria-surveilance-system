@@ -135,4 +135,10 @@ export const sql = {
   like(col, param) {
     return isPostgres ? `${col} ILIKE ${param}` : `${col} LIKE ${param}`;
   },
+  count(expr) {
+    return isPostgres ? `COUNT(${expr || '*'})::int` : `COUNT(${expr || '*'})`;
+  },
+  countDistinct(expr) {
+    return isPostgres ? `COUNT(DISTINCT ${expr})::int` : `COUNT(DISTINCT ${expr})`;
+  },
 };

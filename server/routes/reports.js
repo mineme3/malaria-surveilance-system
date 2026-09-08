@@ -78,28 +78,28 @@ router.get('/generate', authenticateToken, async (req, res) => {
     if (woreda) { where += ` AND c.woreda = $${paramIndex++}`; params.push(woreda); }
     if (facility_id) { where += ` AND c.facility_id = $${paramIndex++}`; params.push(parseInt(facility_id)); }
 
-    const totalCases = parseInt((await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${where}`, params)).count);
-    const deaths = parseInt((await queryOne(`SELECT COUNT(*) as count FROM malaria_cases c ${where} AND c.outcome = 'Death'`, params)).count);
-    const byRegion = await queryAll(`SELECT c.reporting_region as region, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY c.reporting_region`, params);
-    const byWoreda = await queryAll(`SELECT c.woreda, COUNT(*) as count FROM malaria_cases c ${where} AND c.woreda != '' GROUP BY c.woreda ORDER BY count DESC`, params);
-    const byKebele = await queryAll(`SELECT c.kebele, COUNT(*) as count FROM malaria_cases c ${where} AND c.kebele != '' GROUP BY c.kebele ORDER BY count DESC`, params);
-    const byMender = await queryAll(`SELECT c.house_no as mender, COUNT(*) as count FROM malaria_cases c ${where} AND c.house_no != '' GROUP BY c.house_no ORDER BY count DESC`, params);
-    const byFacility = await queryAll(`SELECT f.name as facility_name, COUNT(*) as count FROM malaria_cases c LEFT JOIN facilities f ON c.facility_id = f.id ${where} GROUP BY c.facility_id, f.name ORDER BY count DESC`, params);
-    const byWeek = await queryAll(`SELECT c.epi_week as week, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY c.epi_week ORDER BY c.epi_week`, params);
-    const byAge = await queryAll(`SELECT c.age_category as category, COUNT(*) as count FROM malaria_cases c ${where} AND c.age_category != '' GROUP BY c.age_category`, params);
-    const bySex = await queryAll(`SELECT c.sex, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY c.sex`, params);
-    const bySpecies = await queryAll(`SELECT c.haemoparasite_spp as species, COUNT(*) as count FROM malaria_cases c ${where} AND c.haemoparasite_spp != '' GROUP BY c.haemoparasite_spp`, params);
-    const byAdmission = await queryAll(`SELECT c.admission_type as type, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY c.admission_type`, params);
-    const facilitiesReporting = parseInt((await queryOne(`SELECT COUNT(DISTINCT c.facility_id) as count FROM malaria_cases c ${where}`, params)).count);
+    const totalCases = parseInt((await queryOne(`SELECT ${sql.count()} as count FROM malaria_cases c ${where}`, params)).count);
+    const deaths = parseInt((await queryOne(`SELECT ${sql.count()} as count FROM malaria_cases c ${where} AND c.outcome = 'Death'`, params)).count);
+    const byRegion = await queryAll(`SELECT c.reporting_region as region, ${sql.count()} as count FROM malaria_cases c ${where} GROUP BY c.reporting_region`, params);
+    const byWoreda = await queryAll(`SELECT c.woreda, ${sql.count()} as count FROM malaria_cases c ${where} AND c.woreda != '' GROUP BY c.woreda ORDER BY count DESC`, params);
+    const byKebele = await queryAll(`SELECT c.kebele, ${sql.count()} as count FROM malaria_cases c ${where} AND c.kebele != '' GROUP BY c.kebele ORDER BY count DESC`, params);
+    const byMender = await queryAll(`SELECT c.house_no as mender, ${sql.count()} as count FROM malaria_cases c ${where} AND c.house_no != '' GROUP BY c.house_no ORDER BY count DESC`, params);
+    const byFacility = await queryAll(`SELECT f.name as facility_name, ${sql.count()} as count FROM malaria_cases c LEFT JOIN facilities f ON c.facility_id = f.id ${where} GROUP BY c.facility_id, f.name ORDER BY count DESC`, params);
+    const byWeek = await queryAll(`SELECT c.epi_week as week, ${sql.count()} as count FROM malaria_cases c ${where} GROUP BY c.epi_week ORDER BY c.epi_week`, params);
+    const byAge = await queryAll(`SELECT c.age_category as category, ${sql.count()} as count FROM malaria_cases c ${where} AND c.age_category != '' GROUP BY c.age_category`, params);
+    const bySex = await queryAll(`SELECT c.sex, ${sql.count()} as count FROM malaria_cases c ${where} GROUP BY c.sex`, params);
+    const bySpecies = await queryAll(`SELECT c.haemoparasite_spp as species, ${sql.count()} as count FROM malaria_cases c ${where} AND c.haemoparasite_spp != '' GROUP BY c.haemoparasite_spp`, params);
+    const byAdmission = await queryAll(`SELECT c.admission_type as type, ${sql.count()} as count FROM malaria_cases c ${where} GROUP BY c.admission_type`, params);
+    const facilitiesReporting = parseInt((await queryOne(`SELECT ${sql.countDistinct('c.facility_id')} as count FROM malaria_cases c ${where}`, params)).count);
 
     // Trend data for weekly/monthly/yearly
     let trendData = [];
     if (type === 'weekly') {
-      trendData = await queryAll(`SELECT ${sql.dateTruncWeek('c.date_seen')} as period, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
+      trendData = await queryAll(`SELECT ${sql.dateTruncWeek('c.date_seen')} as period, ${sql.count()} as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
     } else if (type === 'monthly') {
-      trendData = await queryAll(`SELECT ${sql.dateTruncMonth('c.date_seen')} as period, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
+      trendData = await queryAll(`SELECT ${sql.dateTruncMonth('c.date_seen')} as period, ${sql.count()} as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
     } else if (type === 'annual') {
-      trendData = await queryAll(`SELECT ${sql.dateTruncYear('c.date_seen')} as period, COUNT(*) as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
+      trendData = await queryAll(`SELECT ${sql.dateTruncYear('c.date_seen')} as period, ${sql.count()} as count FROM malaria_cases c ${where} GROUP BY period ORDER BY period`, params);
     }
 
     const report = {
@@ -172,7 +172,7 @@ router.get('/audit', authenticateToken, requireMinRole('district_admin'), async 
       [...params, parseInt(limit), offset]
     );
 
-    const total = parseInt((await queryOne(`SELECT COUNT(*) as count FROM audit_logs a ${where}`, params)).count);
+    const total = parseInt((await queryOne(`SELECT ${sql.count()} as count FROM audit_logs a ${where}`, params)).count);
     res.json({ logs, total });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch audit logs' });

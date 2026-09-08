@@ -237,16 +237,17 @@ export default function Dashboard() {
         </Card>
 
         {/* Sex Distribution */}
+        {stats.cases_by_sex?.length > 0 && (
         <Card>
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-base font-semibold">Cases by Sex</CardTitle>
-            <ShareMenu title="Cases by Sex" data={stats.cases_by_sex.map((s: any) => ({ name: s.sex === 'M' ? 'Male' : 'Female', count: s.count }))} />
+            <ShareMenu title="Cases by Sex" data={stats.cases_by_sex.map((s: any) => ({ name: s.sex === 'M' ? 'Male' : 'Female', count: Number(s.count) }))} />
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie
-                  data={stats.cases_by_sex.map((s: any) => ({ name: s.sex === 'M' ? 'Male' : 'Female', value: s.count }))}
+                  data={stats.cases_by_sex.map((s: any) => ({ name: s.sex === 'M' ? 'Male' : 'Female', value: Number(s.count) }))}
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
@@ -264,6 +265,7 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+        )}
 
         {/* Species Distribution */}
         {stats.species_distribution?.length > 0 && (
@@ -294,12 +296,12 @@ export default function Dashboard() {
           <Card>
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
               <CardTitle className="text-base font-semibold">Admission Type</CardTitle>
-              <ShareMenu title="Admission Type Distribution" data={stats.cases_by_admission.map((a: any) => ({ name: a.type, count: a.count }))} />
+              <ShareMenu title="Admission Type Distribution" data={stats.cases_by_admission.map((a: any) => ({ name: a.type, count: Number(a.count) }))} />
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
-                  <Pie data={stats.cases_by_admission.map((a: any) => ({ name: a.type, value: a.count }))} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                  <Pie data={stats.cases_by_admission.map((a: any) => ({ name: a.type, value: Number(a.count) }))} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
                     {stats.cases_by_admission.map((_: any, i: number) => (
                       <Cell key={i} fill={COLORS[i % COLORS.length]} />
                     ))}

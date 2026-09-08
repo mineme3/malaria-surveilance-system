@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { queryOne, queryAll, run, runReturning, isActive } from './db.js';
+import { queryOne, queryAll, run, runReturning, isActive, sql } from './db.js';
 
 const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 const pick = (arr) => arr[rand(0, arr.length - 1)];
@@ -172,7 +172,7 @@ export async function seedDatabase() {
   const adminUser = await queryOne("SELECT id FROM users WHERE username = 'admin' LIMIT 1");
   const adminId = adminUser?.id || 1;
 
-  const existingCount = await queryOne('SELECT COUNT(*) as cnt FROM malaria_cases');
+  const existingCount = await queryOne(`SELECT ${sql.count()} as cnt FROM malaria_cases`);
   const currentCount = parseInt(existingCount?.cnt || '0', 10);
 
   const TARGET_CASE_COUNT = 50;
@@ -217,7 +217,7 @@ export async function seedDatabase() {
     console.log(`Inserted ${inserted} realistic malaria cases`);
   }
 
-  const auditCount = await queryOne('SELECT COUNT(*) as cnt FROM audit_logs');
+  const auditCount = await queryOne(`SELECT ${sql.count()} as cnt FROM audit_logs`);
   if (parseInt(auditCount?.cnt || '0', 10) < 5) {
     console.log('Seeding audit logs...');
     const auditActions = [
@@ -238,7 +238,7 @@ export async function seedDatabase() {
     console.log(`Audit logs already present (${auditCount?.cnt})`);
   }
 
-  const notifCount = await queryOne('SELECT COUNT(*) as cnt FROM notifications');
+  const notifCount = await queryOne(`SELECT ${sql.count()} as cnt FROM notifications`);
   if (parseInt(notifCount?.cnt || '0', 10) < 5) {
     console.log('Seeding notifications...');
     const allUsers = await queryAll('SELECT id FROM users ORDER BY id');

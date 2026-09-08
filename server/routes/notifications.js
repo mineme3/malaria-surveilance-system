@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { queryOne, queryAll, run, boolCol, boolParam, isActive } from '../db.js';
+import { queryOne, queryAll, run, boolCol, boolParam, isActive, sql } from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
@@ -26,7 +26,7 @@ router.get('/', authenticateToken, async (req, res) => {
 
 router.get('/unread-count', authenticateToken, async (req, res) => {
   try {
-    const result = await queryOne(`SELECT COUNT(*) as count FROM notifications WHERE user_id = $1 AND ${boolCol('is_read', false)}`, [req.user.id]);
+    const result = await queryOne(`SELECT ${sql.count()} as count FROM notifications WHERE user_id = $1 AND ${boolCol('is_read', false)}`, [req.user.id]);
     res.json({ count: parseInt(result.count) });
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch count' });
